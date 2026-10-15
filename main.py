@@ -1,150 +1,366 @@
 import os
 import uuid
-from datetime import datetime
 from collections import deque
+from datetime import datetime
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 
-app = FastAPI(title="SkyNoid Cloud")
+# ============================================================
+# SKYNOID CLOUD SERVER
+# ============================================================
+
+app = FastAPI(
+    title="SkyNoid Cloud",
+    description="Cloud command interface for the SkyNoid robot",
+    version="2.0"
+)
 
 
-# --------------------------------------------------
+# ============================================================
 # CONFIGURATION
-# --------------------------------------------------
+# ============================================================
 
 ROBOT_ID = "SKYNOID_01"
 
 ROBOT_KEY = os.getenv("SKYNOID_ROBOT_KEY")
 
 if not ROBOT_KEY:
-    print("[WARNING] SKYNOID_ROBOT_KEY is not configured.")
+    print(
+        "[WARNING] SKYNOID_ROBOT_KEY environment variable "
+        "is not configured."
+    )
 
 
-# --------------------------------------------------
-# COMMAND QUEUE
-# --------------------------------------------------
+# ============================================================
+# COMMAND STORAGE
+# ============================================================
 
 command_queue = deque()
 
 command_history = {}
 
 
+# ============================================================
+# ALLOWED COMMANDS
+# ============================================================
+
+ALLOWED_COMMANDS = {
+    "TIME",
+    "DATE",
+    "DAY",
+    "ABOUT_SKYNOID",
+    "ABOUT_DRONES",
+    "ABOUT_SKYNOVA",
+}
+
+
+# ============================================================
+# REQUEST MODEL
+# ============================================================
+
 class CommandRequest(BaseModel):
     command: str
 
 
-# --------------------------------------------------
-# PHONE INTERFACE
-# --------------------------------------------------
+# ============================================================
+# ROBOT AUTHENTICATION
+# ============================================================
+
+def authenticate_robot(authorization: str | None):
+
+    if not ROBOT_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="Robot key is not configured on server"
+        )
+
+    expected = f"Bearer {ROBOT_KEY}"
+
+    if authorization != expected:
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized robot"
+        )
+
+
+# ============================================================
+# WEB INTERFACE
+# ============================================================
 
 @app.get("/", response_class=HTMLResponse)
 def home():
 
     return """
-    <!DOCTYPE html>
+<!DOCTYPE html>
 
-    <html>
+<html lang="en">
 
-    <head>
+<head>
 
-        <title>SkyNoid</title>
+    <meta charset="UTF-8">
 
-        <meta
-            name="viewport"
-            content="width=device-width, initial-scale=1"
-        >
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-        <style>
+    <title>SkyNoid</title>
 
-            body {
-                font-family: Arial, sans-serif;
-                text-align: center;
-                background: #07152b;
-                color: white;
-                padding: 30px;
-            }
+    <style>
 
-            h1 {
-                font-size: 38px;
-                margin-bottom: 5px;
-            }
+        * {
+            box-sizing: border-box;
+        }
 
-            .subtitle {
-                color: #b9c7dc;
-                margin-bottom: 30px;
-            }
+        body {
+            margin: 0;
+            min-height: 100vh;
 
-            button {
-                display: block;
-                width: 280px;
-                margin: 18px auto;
-                padding: 18px;
-                font-size: 18px;
-                border: none;
-                border-radius: 12px;
-                cursor: pointer;
-            }
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
 
-            button:active {
-                transform: scale(0.98);
-            }
+            background:
+                linear-gradient(
+                    135deg,
+                    #07152e,
+                    #102b52
+                );
 
-            #status {
-                margin-top: 30px;
-                color: #8fd3ff;
-            }
+            color: white;
 
-        </style>
+            display: flex;
+            justify-content: center;
+            align-items: center;
 
-    </head>
+            padding: 20px;
+        }
 
 
-    <body>
+        .container {
 
-        <h1>SkyNoid</h1>
+            width: 100%;
+            max-width: 500px;
 
-        <p class="subtitle">
+            background:
+                rgba(255, 255, 255, 0.08);
+
+            border:
+                1px solid
+                rgba(255, 255, 255, 0.15);
+
+            border-radius: 24px;
+
+            padding: 30px 22px;
+
+            box-shadow:
+                0 15px 45px
+                rgba(0, 0, 0, 0.35);
+
+            text-align: center;
+        }
+
+
+        .robot-icon {
+
+            font-size: 55px;
+
+            margin-bottom: 5px;
+        }
+
+
+        h1 {
+
+            margin:
+                5px 0 5px 0;
+
+            font-size: 34px;
+
+            letter-spacing: 2px;
+        }
+
+
+        .subtitle {
+
+            color: #c8d9ef;
+
+            margin-bottom: 28px;
+
+            font-size: 16px;
+        }
+
+
+        .button {
+
+            width: 100%;
+
+            padding:
+                16px 18px;
+
+            margin:
+                8px 0;
+
+            border: none;
+
+            border-radius: 14px;
+
+            background: white;
+
+            color: #102b52;
+
+            font-size: 16px;
+
+            font-weight: bold;
+
+            cursor: pointer;
+
+            transition:
+                transform 0.15s,
+                background 0.15s;
+        }
+
+
+        .button:hover {
+
+            transform:
+                translateY(-2px);
+
+            background:
+                #eaf3ff;
+        }
+
+
+        .button:active {
+
+            transform:
+                scale(0.98);
+        }
+
+
+        #status {
+
+            min-height: 24px;
+
+            margin-top: 20px;
+
+            color: #b9dcff;
+
+            font-size: 14px;
+        }
+
+
+        .footer {
+
+            margin-top: 25px;
+
+            font-size: 12px;
+
+            color: #8faac8;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+    <div class="container">
+
+        <div class="robot-icon">
+            🤖
+        </div>
+
+        <h1>
+            SKYNOID
+        </h1>
+
+        <div class="subtitle">
             What would you like to ask me?
-        </p>
+        </div>
 
 
-        <button onclick="sendCommand('TIME')">
-            🕐 Current Time
+        <button
+            class="button"
+            onclick="sendCommand('TIME')"
+        >
+            🕐 Tell me the current time
         </button>
 
 
-        <button onclick="sendCommand('DATE')">
-            📅 Today's Date
+        <button
+            class="button"
+            onclick="sendCommand('DATE')"
+        >
+            📅 Tell me today's date
         </button>
 
 
-        <button onclick="sendCommand('DAY')">
-            📆 Current Day
+        <button
+            class="button"
+            onclick="sendCommand('DAY')"
+        >
+            📆 Tell me what day it is
         </button>
 
 
-        <p id="status"></p>
+        <button
+            class="button"
+            onclick="sendCommand('ABOUT_SKYNOID')"
+        >
+            🤖 Tell me about SkyNoid
+        </button>
 
 
-        <script>
-
-            async function sendCommand(command) {
-
-                const status =
-                    document.getElementById("status");
-
-                status.innerText =
-                    "Sending command to SkyNoid...";
+        <button
+            class="button"
+            onclick="sendCommand('ABOUT_DRONES')"
+        >
+            🚁 Tell me about Drones
+        </button>
 
 
-                try {
+        <button
+            class="button"
+            onclick="sendCommand('ABOUT_SKYNOVA')"
+        >
+            🏢 Tell me about SkyNova Drones
+        </button>
 
-                    const response =
-                        await fetch("/command", {
 
+        <div id="status">
+            SkyNoid is ready.
+        </div>
+
+
+        <div class="footer">
+            SkyNova Drones
+        </div>
+
+    </div>
+
+
+    <script>
+
+        async function sendCommand(command) {
+
+            const status =
+                document.getElementById("status");
+
+            status.innerText =
+                "Sending request to SkyNoid...";
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        "/command",
+                        {
                             method: "POST",
 
                             headers: {
@@ -152,70 +368,64 @@ def home():
                                     "application/json"
                             },
 
-                            body: JSON.stringify({
-                                command: command
-                            })
-
-                        });
-
-
-                    const data =
-                        await response.json();
+                            body:
+                                JSON.stringify({
+                                    command: command
+                                })
+                        }
+                    );
 
 
-                    if (data.status === "queued") {
+                const data =
+                    await response.json();
 
-                        status.innerText =
-                            "Sent to SkyNoid: " +
-                            data.command;
 
-                    } else {
-
-                        status.innerText =
-                            "Unable to send command.";
-
-                    }
-
-                }
-
-                catch (error) {
+                if (!response.ok) {
 
                     status.innerText =
-                        "Connection error.";
+                        data.detail ||
+                        "Unable to send command.";
 
+                    return;
                 }
+
+
+                status.innerText =
+                    "Request sent to SkyNoid.";
 
             }
 
-        </script>
+            catch (error) {
 
-    </body>
+                status.innerText =
+                    "Unable to connect to SkyNoid.";
 
-    </html>
-    """
+            }
+
+        }
+
+    </script>
+
+</body>
+
+</html>
+"""
 
 
-# --------------------------------------------------
-# PHONE SENDS COMMAND
-# --------------------------------------------------
+# ============================================================
+# PUBLIC COMMAND SUBMISSION
+# ============================================================
 
 @app.post("/command")
-def create_command(request: CommandRequest):
+def submit_command(request: CommandRequest):
 
     command = request.command.strip().upper()
 
-    allowed_commands = {
-        "TIME",
-        "DATE",
-        "DAY"
-    }
-
-
-    if command not in allowed_commands:
+    if command not in ALLOWED_COMMANDS:
 
         raise HTTPException(
             status_code=400,
-            detail="Unknown command"
+            detail="Invalid SkyNoid command"
         )
 
 
@@ -226,16 +436,13 @@ def create_command(request: CommandRequest):
 
         "id": command_id,
 
-        "robot_id": ROBOT_ID,
-
         "command": command,
 
         "status": "pending",
 
         "created_at":
-            datetime.now().isoformat(),
+            datetime.utcnow().isoformat()
 
-        "completed_at": None
     }
 
 
@@ -245,56 +452,31 @@ def create_command(request: CommandRequest):
 
 
     print(
-        f"[QUEUE] Added {command} "
-        f"id={command_id}"
+        f"[QUEUE] Added: "
+        f"{command} | {command_id}"
     )
 
 
     return {
 
-        "status": "queued",
+        "success": True,
 
         "id": command_id,
 
-        "command": command
+        "command": command,
+
+        "status": "pending"
+
     }
 
 
-# --------------------------------------------------
-# ROBOT AUTHENTICATION
-# --------------------------------------------------
-
-def authenticate_robot(
-    authorization: str | None
-):
-
-    if not ROBOT_KEY:
-
-        raise HTTPException(
-            status_code=500,
-            detail="Robot key not configured"
-        )
-
-
-    expected = f"Bearer {ROBOT_KEY}"
-
-
-    if authorization != expected:
-
-        raise HTTPException(
-            status_code=401,
-            detail="Unauthorized robot"
-        )
-
-
-# --------------------------------------------------
-# ROBOT REQUESTS NEXT COMMAND
-# --------------------------------------------------
+# ============================================================
+# ROBOT GETS NEXT COMMAND
+# ============================================================
 
 @app.get("/robot/command")
 def get_robot_command(
-    authorization: str | None =
-        Header(default=None)
+    authorization: str | None = Header(default=None)
 ):
 
     authenticate_robot(authorization)
@@ -309,75 +491,93 @@ def get_robot_command(
 
     item = command_queue.popleft()
 
+
     item["status"] = "processing"
 
-
-    print(
-        f"[ROBOT] Sending "
-        f"{item['command']} "
-        f"id={item['id']}"
+    item["processing_at"] = (
+        datetime.utcnow().isoformat()
     )
 
 
-    return item
+    command_history[item["id"]] = item
 
 
-# --------------------------------------------------
-# ROBOT ACKNOWLEDGES COMPLETION
-# --------------------------------------------------
+    print(
+        f"[ROBOT] Sending: "
+        f"{item['command']} | {item['id']}"
+    )
+
+
+    return {
+
+        "id": item["id"],
+
+        "command": item["command"],
+
+        "status": item["status"]
+
+    }
+
+
+# ============================================================
+# ROBOT ACKNOWLEDGES COMPLETED COMMAND
+# ============================================================
 
 @app.post("/robot/ack/{command_id}")
 def acknowledge_command(
     command_id: str,
-    authorization: str | None =
-        Header(default=None)
+    authorization: str | None = Header(default=None)
 ):
 
     authenticate_robot(authorization)
 
 
-    item = command_history.get(command_id)
-
-
-    if not item:
+    if command_id not in command_history:
 
         raise HTTPException(
             status_code=404,
             detail="Command not found"
         )
+
+
+    item = command_history[command_id]
 
 
     item["status"] = "completed"
 
     item["completed_at"] = (
-        datetime.now().isoformat()
+        datetime.utcnow().isoformat()
     )
 
 
+    command_history[command_id] = item
+
+
     print(
-        f"[ROBOT] Completed "
-        f"{item['command']} "
-        f"id={command_id}"
+        f"[ACK] Completed: "
+        f"{item['command']} | {command_id}"
     )
 
 
     return {
-        "status": "completed",
-        "id": command_id
+
+        "success": True,
+
+        "id": command_id,
+
+        "status": "completed"
+
     }
 
 
-# --------------------------------------------------
+# ============================================================
 # COMMAND STATUS
-# --------------------------------------------------
+# ============================================================
 
 @app.get("/command/{command_id}")
 def command_status(command_id: str):
 
-    item = command_history.get(command_id)
-
-
-    if not item:
+    if command_id not in command_history:
 
         raise HTTPException(
             status_code=404,
@@ -385,18 +585,26 @@ def command_status(command_id: str):
         )
 
 
-    return item
+    return command_history[command_id]
 
 
-# --------------------------------------------------
+# ============================================================
 # HEALTH CHECK
-# --------------------------------------------------
+# ============================================================
 
 @app.get("/health")
 def health():
 
     return {
+
         "status": "online",
+
         "robot": ROBOT_ID,
-        "queue_length": len(command_queue)
+
+        "queue_length":
+            len(command_queue),
+
+        "available_commands":
+            len(ALLOWED_COMMANDS)
+
     }
