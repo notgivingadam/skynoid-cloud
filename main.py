@@ -697,7 +697,7 @@ def home():
                     id="person"
                     class="form-control"
                     type="text"
-                    placeholder="e.g. SkyNoid"
+                    placeholder="e.g. Your Name"
                 >
 
             </div>
@@ -904,6 +904,15 @@ def home():
                 onclick="setMedicineReminder()"
             >
                 💊 Set Medicine Reminder
+            </button>
+
+
+            <button
+                id="calendarButton"
+                class="button"
+                onclick="testCalendarButton()"
+            >
+                📱 Add to Phone Calendar
             </button>
 
 
@@ -1272,6 +1281,19 @@ def home():
                     + "SkyNoid will remind you "
                     + "10 minutes before medicine time.";
             }
+        }
+
+
+        // ====================================================
+        // TEST PHONE CALENDAR BUTTON
+        // ====================================================
+
+        function testCalendarButton() {
+
+            document.getElementById(
+                "status"
+            ).innerText =
+                "Phone calendar button is working.";
         }
 
 
