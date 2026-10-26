@@ -578,7 +578,7 @@ def home():
 
 
             <button
-                class="button medicine-button"
+                class="button"
                 onclick="showMedicineMenu()"
             >
                 💊 Medicine Reminder
@@ -697,7 +697,7 @@ def home():
                     id="person"
                     class="form-control"
                     type="text"
-                    placeholder="e.g. Damini"
+                    placeholder="e.g. SkyNoid"
                 >
 
             </div>
