@@ -1,5 +1,6 @@
 import os
 import uuid
+
 from collections import deque
 from datetime import datetime
 
@@ -15,7 +16,7 @@ from pydantic import BaseModel
 app = FastAPI(
     title="SkyNoid Cloud",
     description="Cloud command interface for the SkyNoid robot",
-    version="2.1"
+    version="2.2"
 )
 
 
@@ -56,6 +57,7 @@ ALLOWED_COMMANDS = {
     "ABOUT_SKYNOVA",
     "PLAY_SONG",
     "STOP_MUSIC",
+    "SET_MEDICINE_REMINDER",
 }
 
 
@@ -73,6 +75,29 @@ ALLOWED_SONGS = {
 
 
 # ============================================================
+# ALLOWED REPEAT TYPES
+# ============================================================
+
+ALLOWED_REPEAT_TYPES = {
+    "once",
+    "daily",
+    "weekdays",
+    "selected",
+}
+
+
+ALLOWED_DAYS = {
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+}
+
+
+# ============================================================
 # REQUEST MODEL
 # ============================================================
 
@@ -85,17 +110,23 @@ class CommandRequest(BaseModel):
 # ROBOT AUTHENTICATION
 # ============================================================
 
-def authenticate_robot(authorization: str | None):
+def authenticate_robot(
+    authorization: str | None
+):
 
     if not ROBOT_KEY:
+
         raise HTTPException(
             status_code=500,
             detail="Robot key is not configured on server"
         )
 
+
     expected = f"Bearer {ROBOT_KEY}"
 
+
     if authorization != expected:
+
         raise HTTPException(
             status_code=401,
             detail="Unauthorized robot"
@@ -106,7 +137,10 @@ def authenticate_robot(authorization: str | None):
 # WEB INTERFACE
 # ============================================================
 
-@app.get("/", response_class=HTMLResponse)
+@app.get(
+    "/",
+    response_class=HTMLResponse
+)
 def home():
 
     return """
@@ -125,14 +159,18 @@ def home():
 
     <title>SkyNoid</title>
 
+
     <style>
 
         * {
             box-sizing: border-box;
         }
 
+
         body {
+
             margin: 0;
+
             min-height: 100vh;
 
             font-family:
@@ -150,7 +188,9 @@ def home():
             color: white;
 
             display: flex;
+
             justify-content: center;
+
             align-items: center;
 
             padding: 20px;
@@ -160,6 +200,7 @@ def home():
         .container {
 
             width: 100%;
+
             max-width: 500px;
 
             background:
@@ -266,6 +307,14 @@ def home():
         }
 
 
+        .medicine-button {
+
+            background: #e8fff0;
+
+            color: #155b31;
+        }
+
+
         .stop-button {
 
             background: #ffe8e8;
@@ -287,6 +336,139 @@ def home():
         }
 
 
+        .form-group {
+
+            text-align: left;
+
+            margin:
+                15px 0;
+        }
+
+
+        .form-group label {
+
+            display: block;
+
+            margin-bottom: 7px;
+
+            color: #dcecff;
+
+            font-size: 14px;
+
+            font-weight: bold;
+        }
+
+
+        .form-control {
+
+            width: 100%;
+
+            padding:
+                13px 14px;
+
+            border: none;
+
+            border-radius: 11px;
+
+            background:
+                rgba(255, 255, 255, 0.96);
+
+            color: #102b52;
+
+            font-size: 16px;
+
+            outline: none;
+        }
+
+
+        .form-control:focus {
+
+            box-shadow:
+                0 0 0 3px
+                rgba(120, 184, 255, 0.35);
+        }
+
+
+        .help-text {
+
+            color: #a9c5e5;
+
+            font-size: 12px;
+
+            margin-top: 6px;
+        }
+
+
+        .reminder-badge {
+
+            margin:
+                15px 0;
+
+            padding:
+                12px;
+
+            border-radius:
+                12px;
+
+            background:
+                rgba(80, 220, 130, 0.12);
+
+            border:
+                1px solid
+                rgba(100, 240, 150, 0.25);
+
+            color:
+                #c8ffd9;
+
+            font-size:
+                14px;
+        }
+
+
+        .days-container {
+
+            display: none;
+
+            grid-template-columns:
+                repeat(2, 1fr);
+
+            gap: 8px;
+
+            margin-top: 8px;
+        }
+
+
+        .day-option {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 7px;
+
+            background:
+                rgba(255, 255, 255, 0.1);
+
+            padding:
+                10px;
+
+            border-radius:
+                9px;
+
+            color:
+                white;
+
+            font-size:
+                13px;
+        }
+
+
+        #onceDateGroup {
+
+            display: none;
+        }
+
+
         #status {
 
             min-height: 24px;
@@ -296,6 +478,8 @@ def home():
             color: #b9dcff;
 
             font-size: 14px;
+
+            line-height: 1.4;
         }
 
 
@@ -322,9 +506,9 @@ def home():
         </div>
 
 
-        <!-- ================================================ -->
-        <!-- MAIN MENU                                        -->
-        <!-- ================================================ -->
+        <!-- ================================================= -->
+        <!-- MAIN MENU                                         -->
+        <!-- ================================================= -->
 
         <div id="mainMenu">
 
@@ -392,12 +576,20 @@ def home():
                 🎵 Play a Song
             </button>
 
+
+            <button
+                class="button medicine-button"
+                onclick="showMedicineMenu()"
+            >
+                💊 Medicine Reminder
+            </button>
+
         </div>
 
 
-        <!-- ================================================ -->
-        <!-- SONG MENU                                        -->
-        <!-- ================================================ -->
+        <!-- ================================================= -->
+        <!-- SONG MENU                                         -->
+        <!-- ================================================= -->
 
         <div
             id="songMenu"
@@ -471,6 +663,260 @@ def home():
         </div>
 
 
+        <!-- ================================================= -->
+        <!-- MEDICINE REMINDER MENU                            -->
+        <!-- ================================================= -->
+
+        <div
+            id="medicineMenu"
+            style="display: none;"
+        >
+
+            <h2>
+                💊 MEDICINE REMINDER
+            </h2>
+
+            <div class="subtitle">
+                Set a medicine reminder with SkyNoid
+            </div>
+
+
+            <div class="reminder-badge">
+                🔔 SkyNoid will remind you
+                10 minutes before medicine time.
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="person">
+                    Person
+                </label>
+
+                <input
+                    id="person"
+                    class="form-control"
+                    type="text"
+                    placeholder="e.g. Damini"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="medicine">
+                    Medicine name
+                </label>
+
+                <input
+                    id="medicine"
+                    class="form-control"
+                    type="text"
+                    placeholder="e.g. Vitamin D"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="instruction">
+                    Dose / Instruction
+                </label>
+
+                <input
+                    id="instruction"
+                    class="form-control"
+                    type="text"
+                    placeholder="e.g. Take one tablet"
+                >
+
+                <div class="help-text">
+                    Optional
+                </div>
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="medicineTime">
+                    Medicine time
+                </label>
+
+                <input
+                    id="medicineTime"
+                    class="form-control"
+                    type="time"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="repeatType">
+                    Repeat
+                </label>
+
+                <select
+                    id="repeatType"
+                    class="form-control"
+                    onchange="repeatChanged()"
+                >
+
+                    <option value="once">
+                        Once
+                    </option>
+
+                    <option value="daily">
+                        Every day
+                    </option>
+
+                    <option value="weekdays">
+                        Monday - Friday
+                    </option>
+
+                    <option value="selected">
+                        Selected days
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <!-- ONCE DATE -->
+
+            <div
+                class="form-group"
+                id="onceDateGroup"
+            >
+
+                <label for="medicineDate">
+                    Date
+                </label>
+
+                <input
+                    id="medicineDate"
+                    class="form-control"
+                    type="date"
+                >
+
+            </div>
+
+
+            <!-- SELECTED DAYS -->
+
+            <div
+                class="form-group"
+                id="selectedDaysGroup"
+                style="display: none;"
+            >
+
+                <label>
+                    Select days
+                </label>
+
+
+                <div
+                    class="days-container"
+                    id="daysContainer"
+                >
+
+                    <label class="day-option">
+                        <input
+                            type="checkbox"
+                            value="monday"
+                            class="medicine-day"
+                        >
+                        Monday
+                    </label>
+
+
+                    <label class="day-option">
+                        <input
+                            type="checkbox"
+                            value="tuesday"
+                            class="medicine-day"
+                        >
+                        Tuesday
+                    </label>
+
+
+                    <label class="day-option">
+                        <input
+                            type="checkbox"
+                            value="wednesday"
+                            class="medicine-day"
+                        >
+                        Wednesday
+                    </label>
+
+
+                    <label class="day-option">
+                        <input
+                            type="checkbox"
+                            value="thursday"
+                            class="medicine-day"
+                        >
+                        Thursday
+                    </label>
+
+
+                    <label class="day-option">
+                        <input
+                            type="checkbox"
+                            value="friday"
+                            class="medicine-day"
+                        >
+                        Friday
+                    </label>
+
+
+                    <label class="day-option">
+                        <input
+                            type="checkbox"
+                            value="saturday"
+                            class="medicine-day"
+                        >
+                        Saturday
+                    </label>
+
+
+                    <label class="day-option">
+                        <input
+                            type="checkbox"
+                            value="sunday"
+                            class="medicine-day"
+                        >
+                        Sunday
+                    </label>
+
+                </div>
+
+            </div>
+
+
+            <button
+                class="button medicine-button"
+                onclick="setMedicineReminder()"
+            >
+                💊 Set Medicine Reminder
+            </button>
+
+
+            <button
+                class="button back-button"
+                onclick="showMainMenu()"
+            >
+                ← Back to Menu
+            </button>
+
+        </div>
+
+
         <div id="status">
             SkyNoid is ready.
         </div>
@@ -486,13 +932,46 @@ def home():
     <script>
 
         // ====================================================
-        // MENU NAVIGATION
+        // SHOW MAIN MENU
+        // ====================================================
+
+        function showMainMenu() {
+
+            document.getElementById(
+                "mainMenu"
+            ).style.display = "block";
+
+
+            document.getElementById(
+                "songMenu"
+            ).style.display = "none";
+
+
+            document.getElementById(
+                "medicineMenu"
+            ).style.display = "none";
+
+
+            document.getElementById(
+                "status"
+            ).innerText =
+                "SkyNoid is ready.";
+        }
+
+
+        // ====================================================
+        // SHOW SONG MENU
         // ====================================================
 
         function showSongMenu() {
 
             document.getElementById(
                 "mainMenu"
+            ).style.display = "none";
+
+
+            document.getElementById(
+                "medicineMenu"
             ).style.display = "none";
 
 
@@ -505,11 +984,19 @@ def home():
                 "status"
             ).innerText =
                 "Select a song.";
-
         }
 
 
-        function showMainMenu() {
+        // ====================================================
+        // SHOW MEDICINE MENU
+        // ====================================================
+
+        function showMedicineMenu() {
+
+            document.getElementById(
+                "mainMenu"
+            ).style.display = "none";
+
 
             document.getElementById(
                 "songMenu"
@@ -517,15 +1004,84 @@ def home():
 
 
             document.getElementById(
-                "mainMenu"
+                "medicineMenu"
             ).style.display = "block";
 
 
             document.getElementById(
                 "status"
             ).innerText =
-                "SkyNoid is ready.";
+                "Enter the medicine details.";
 
+
+            repeatChanged();
+        }
+
+
+        // ====================================================
+        // REPEAT TYPE CHANGED
+        // ====================================================
+
+        function repeatChanged() {
+
+            const repeat =
+                document.getElementById(
+                    "repeatType"
+                ).value;
+
+
+            const onceDateGroup =
+                document.getElementById(
+                    "onceDateGroup"
+                );
+
+
+            const selectedDaysGroup =
+                document.getElementById(
+                    "selectedDaysGroup"
+                );
+
+
+            const daysContainer =
+                document.getElementById(
+                    "daysContainer"
+                );
+
+
+            if (repeat === "once") {
+
+                onceDateGroup.style.display =
+                    "block";
+
+            }
+
+            else {
+
+                onceDateGroup.style.display =
+                    "none";
+
+            }
+
+
+            if (repeat === "selected") {
+
+                selectedDaysGroup.style.display =
+                    "block";
+
+                daysContainer.style.display =
+                    "grid";
+
+            }
+
+            else {
+
+                selectedDaysGroup.style.display =
+                    "none";
+
+                daysContainer.style.display =
+                    "none";
+
+            }
         }
 
 
@@ -541,7 +1097,6 @@ def home():
                     song: song
                 }
             );
-
         }
 
 
@@ -554,7 +1109,169 @@ def home():
             sendCommand(
                 "STOP_MUSIC"
             );
+        }
 
+
+        // ====================================================
+        // SET MEDICINE REMINDER
+        // ====================================================
+
+        async function setMedicineReminder() {
+
+            const status =
+                document.getElementById(
+                    "status"
+                );
+
+
+            const person =
+                document.getElementById(
+                    "person"
+                ).value.trim();
+
+
+            const medicine =
+                document.getElementById(
+                    "medicine"
+                ).value.trim();
+
+
+            const instruction =
+                document.getElementById(
+                    "instruction"
+                ).value.trim();
+
+
+            const time =
+                document.getElementById(
+                    "medicineTime"
+                ).value;
+
+
+            const repeat =
+                document.getElementById(
+                    "repeatType"
+                ).value;
+
+
+            const date =
+                document.getElementById(
+                    "medicineDate"
+                ).value;
+
+
+            const selectedDays = [];
+
+
+            document.querySelectorAll(
+                ".medicine-day:checked"
+            ).forEach(
+                function(item) {
+
+                    selectedDays.push(
+                        item.value
+                    );
+                }
+            );
+
+
+            // -----------------------------------------------
+            // VALIDATION
+            // -----------------------------------------------
+
+            if (!person) {
+
+                status.innerText =
+                    "Please enter the person's name.";
+
+                return;
+            }
+
+
+            if (!medicine) {
+
+                status.innerText =
+                    "Please enter the medicine name.";
+
+                return;
+            }
+
+
+            if (!time) {
+
+                status.innerText =
+                    "Please select the medicine time.";
+
+                return;
+            }
+
+
+            if (
+                repeat === "once"
+                && !date
+            ) {
+
+                status.innerText =
+                    "Please select the medicine date.";
+
+                return;
+            }
+
+
+            if (
+                repeat === "selected"
+                && selectedDays.length === 0
+            ) {
+
+                status.innerText =
+                    "Please select at least one day.";
+
+                return;
+            }
+
+
+            const payload = {
+
+                person: person,
+
+                medicine: medicine,
+
+                instruction: instruction,
+
+                time: time,
+
+                repeat: repeat,
+
+                date:
+                    repeat === "once"
+                        ? date
+                        : null,
+
+                selected_days:
+                    repeat === "selected"
+                        ? selectedDays
+                        : []
+            };
+
+
+            status.innerText =
+                "Setting medicine reminder...";
+
+
+            const success =
+                await sendCommand(
+                    "SET_MEDICINE_REMINDER",
+                    payload
+                );
+
+
+            if (success) {
+
+                status.innerText =
+                    "Medicine reminder sent to SkyNoid. "
+                    + "SkyNoid will remind you "
+                    + "10 minutes before medicine time.";
+            }
         }
 
 
@@ -568,20 +1285,38 @@ def home():
         ) {
 
             const status =
-                document.getElementById("status");
+                document.getElementById(
+                    "status"
+                );
 
 
-            if (command === "PLAY_SONG") {
+            if (
+                command ===
+                "PLAY_SONG"
+            ) {
 
                 status.innerText =
                     "Asking SkyNoid to play the song...";
 
             }
 
-            else if (command === "STOP_MUSIC") {
+            else if (
+                command ===
+                "STOP_MUSIC"
+            ) {
 
                 status.innerText =
                     "Stopping music...";
+
+            }
+
+            else if (
+                command ===
+                "SET_MEDICINE_REMINDER"
+            ) {
+
+                status.innerText =
+                    "Sending medicine reminder to SkyNoid...";
 
             }
 
@@ -622,24 +1357,41 @@ def home():
                 if (!response.ok) {
 
                     status.innerText =
-                        data.detail ||
+                        data.detail
+                        ||
                         "Unable to send command.";
 
-                    return;
+                    return false;
                 }
 
 
-                if (command === "PLAY_SONG") {
+                if (
+                    command ===
+                    "PLAY_SONG"
+                ) {
 
                     status.innerText =
                         "Song request sent to SkyNoid.";
 
                 }
 
-                else if (command === "STOP_MUSIC") {
+                else if (
+                    command ===
+                    "STOP_MUSIC"
+                ) {
 
                     status.innerText =
                         "Stop request sent to SkyNoid.";
+
+                }
+
+                else if (
+                    command ===
+                    "SET_MEDICINE_REMINDER"
+                ) {
+
+                    status.innerText =
+                        "Medicine reminder sent to SkyNoid.";
 
                 }
 
@@ -650,6 +1402,9 @@ def home():
 
                 }
 
+
+                return true;
+
             }
 
             catch (error) {
@@ -657,9 +1412,15 @@ def home():
                 status.innerText =
                     "Unable to connect to SkyNoid.";
 
-            }
+                return false;
 
+            }
         }
+
+
+        // Initialize conditional form fields.
+
+        repeatChanged();
 
     </script>
 
@@ -674,12 +1435,25 @@ def home():
 # ============================================================
 
 @app.post("/command")
-def submit_command(request: CommandRequest):
+def submit_command(
+    request: CommandRequest
+):
 
-    command = request.command.strip().upper()
+    command = (
+        request.command
+        .strip()
+        .upper()
+    )
 
-    payload = request.payload or {}
+    payload = (
+        request.payload
+        or {}
+    )
 
+
+    # --------------------------------------------------------
+    # VALID COMMAND
+    # --------------------------------------------------------
 
     if command not in ALLOWED_COMMANDS:
 
@@ -690,7 +1464,7 @@ def submit_command(request: CommandRequest):
 
 
     # --------------------------------------------------------
-    # VALIDATE SONG
+    # PLAY SONG
     # --------------------------------------------------------
 
     if command == "PLAY_SONG":
@@ -716,69 +1490,324 @@ def submit_command(request: CommandRequest):
         }
 
 
-    # STOP_MUSIC does not require a payload
+    # --------------------------------------------------------
+    # STOP MUSIC
+    # --------------------------------------------------------
 
     elif command == "STOP_MUSIC":
 
         payload = {}
 
 
-    # Existing commands do not require payloads
+    # --------------------------------------------------------
+    # MEDICINE REMINDER
+    # --------------------------------------------------------
+
+    elif command == "SET_MEDICINE_REMINDER":
+
+        person = str(
+            payload.get(
+                "person",
+                ""
+            )
+        ).strip()
+
+
+        medicine = str(
+            payload.get(
+                "medicine",
+                ""
+            )
+        ).strip()
+
+
+        instruction = str(
+            payload.get(
+                "instruction",
+                ""
+            )
+        ).strip()
+
+
+        time_text = str(
+            payload.get(
+                "time",
+                ""
+            )
+        ).strip()
+
+
+        repeat = str(
+            payload.get(
+                "repeat",
+                "once"
+            )
+        ).strip().lower()
+
+
+        date_text = payload.get(
+            "date"
+        )
+
+
+        selected_days = payload.get(
+            "selected_days",
+            []
+        )
+
+
+        if not person:
+
+            raise HTTPException(
+                status_code=400,
+                detail="Person name is required"
+            )
+
+
+        if not medicine:
+
+            raise HTTPException(
+                status_code=400,
+                detail="Medicine name is required"
+            )
+
+
+        # Basic HH:MM validation.
+
+        try:
+
+            hour_text, minute_text = (
+                time_text.split(":")
+            )
+
+            hour = int(
+                hour_text
+            )
+
+            minute = int(
+                minute_text
+            )
+
+        except (
+            ValueError,
+            AttributeError
+        ):
+
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid medicine time"
+            )
+
+
+        if (
+            hour < 0
+            or hour > 23
+            or minute < 0
+            or minute > 59
+        ):
+
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid medicine time"
+            )
+
+
+        if repeat not in ALLOWED_REPEAT_TYPES:
+
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid repeat option"
+            )
+
+
+        if repeat == "once":
+
+            if not date_text:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail="Medicine date is required"
+                )
+
+
+            try:
+
+                datetime.strptime(
+                    str(date_text),
+                    "%Y-%m-%d"
+                )
+
+            except ValueError:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid medicine date"
+                )
+
+
+        else:
+
+            date_text = None
+
+
+        if repeat == "selected":
+
+            if not isinstance(
+                selected_days,
+                list
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid selected days"
+                )
+
+
+            cleaned_days = []
+
+
+            for day in selected_days:
+
+                clean_day = (
+                    str(day)
+                    .strip()
+                    .lower()
+                )
+
+
+                if clean_day not in ALLOWED_DAYS:
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Invalid selected day"
+                    )
+
+
+                if clean_day not in cleaned_days:
+
+                    cleaned_days.append(
+                        clean_day
+                    )
+
+
+            if not cleaned_days:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail="Select at least one day"
+                )
+
+
+            selected_days = cleaned_days
+
+
+        else:
+
+            selected_days = []
+
+
+        payload = {
+
+            "person":
+                person,
+
+            "medicine":
+                medicine,
+
+            "instruction":
+                instruction,
+
+            "time":
+                time_text,
+
+            "repeat":
+                repeat,
+
+            "date":
+                date_text,
+
+            "selected_days":
+                selected_days
+        }
+
+
+    # --------------------------------------------------------
+    # OLD COMMANDS
+    # --------------------------------------------------------
 
     else:
 
         payload = {}
 
 
-    command_id = str(uuid.uuid4())
+    # --------------------------------------------------------
+    # CREATE COMMAND
+    # --------------------------------------------------------
+
+    command_id = str(
+        uuid.uuid4()
+    )
 
 
     item = {
 
-        "id": command_id,
+        "id":
+            command_id,
 
-        "command": command,
+        "command":
+            command,
 
-        "payload": payload,
+        "payload":
+            payload,
 
-        "status": "pending",
+        "status":
+            "pending",
 
         "created_at":
             datetime.utcnow().isoformat()
-
     }
 
 
-    command_queue.append(item)
+    command_queue.append(
+        item
+    )
 
-    command_history[command_id] = item
+    command_history[
+        command_id
+    ] = item
 
 
     print(
         f"[QUEUE] Added: "
-        f"{command} | {command_id}"
+        f"{command} | "
+        f"{command_id}"
     )
 
 
     if payload:
 
         print(
-            f"[QUEUE] Payload: {payload}"
+            f"[QUEUE] Payload: "
+            f"{payload}"
         )
 
 
     return {
 
-        "success": True,
+        "success":
+            True,
 
-        "id": command_id,
+        "id":
+            command_id,
 
-        "command": command,
+        "command":
+            command,
 
-        "payload": payload,
+        "payload":
+            payload,
 
-        "status": "pending"
-
+        "status":
+            "pending"
     }
 
 
@@ -788,10 +1817,14 @@ def submit_command(request: CommandRequest):
 
 @app.get("/robot/command")
 def get_robot_command(
-    authorization: str | None = Header(default=None)
+    authorization:
+        str | None
+        = Header(default=None)
 ):
 
-    authenticate_robot(authorization)
+    authenticate_robot(
+        authorization
+    )
 
 
     if not command_queue:
@@ -801,26 +1834,35 @@ def get_robot_command(
         }
 
 
-    item = command_queue.popleft()
+    item = (
+        command_queue.popleft()
+    )
 
 
-    item["status"] = "processing"
+    item["status"] = (
+        "processing"
+    )
 
     item["processing_at"] = (
         datetime.utcnow().isoformat()
     )
 
 
-    command_history[item["id"]] = item
+    command_history[
+        item["id"]
+    ] = item
 
 
     print(
         f"[ROBOT] Sending: "
-        f"{item['command']} | {item['id']}"
+        f"{item['command']} | "
+        f"{item['id']}"
     )
 
 
-    if item.get("payload"):
+    if item.get(
+        "payload"
+    ):
 
         print(
             f"[ROBOT] Payload: "
@@ -830,9 +1872,11 @@ def get_robot_command(
 
     return {
 
-        "id": item["id"],
+        "id":
+            item["id"],
 
-        "command": item["command"],
+        "command":
+            item["command"],
 
         "payload":
             item.get(
@@ -840,25 +1884,34 @@ def get_robot_command(
                 {}
             ),
 
-        "status": item["status"]
-
+        "status":
+            item["status"]
     }
 
 
 # ============================================================
-# ROBOT ACKNOWLEDGES COMPLETED COMMAND
+# ROBOT ACKNOWLEDGES COMMAND
 # ============================================================
 
-@app.post("/robot/ack/{command_id}")
+@app.post(
+    "/robot/ack/{command_id}"
+)
 def acknowledge_command(
     command_id: str,
-    authorization: str | None = Header(default=None)
+    authorization:
+        str | None
+        = Header(default=None)
 ):
 
-    authenticate_robot(authorization)
+    authenticate_robot(
+        authorization
+    )
 
 
-    if command_id not in command_history:
+    if (
+        command_id
+        not in command_history
+    ):
 
         raise HTTPException(
             status_code=404,
@@ -866,33 +1919,44 @@ def acknowledge_command(
         )
 
 
-    item = command_history[command_id]
+    item = (
+        command_history[
+            command_id
+        ]
+    )
 
 
-    item["status"] = "completed"
+    item["status"] = (
+        "completed"
+    )
 
     item["completed_at"] = (
         datetime.utcnow().isoformat()
     )
 
 
-    command_history[command_id] = item
+    command_history[
+        command_id
+    ] = item
 
 
     print(
         f"[ACK] Completed: "
-        f"{item['command']} | {command_id}"
+        f"{item['command']} | "
+        f"{command_id}"
     )
 
 
     return {
 
-        "success": True,
+        "success":
+            True,
 
-        "id": command_id,
+        "id":
+            command_id,
 
-        "status": "completed"
-
+        "status":
+            "completed"
     }
 
 
@@ -900,10 +1964,17 @@ def acknowledge_command(
 # COMMAND STATUS
 # ============================================================
 
-@app.get("/command/{command_id}")
-def command_status(command_id: str):
+@app.get(
+    "/command/{command_id}"
+)
+def command_status(
+    command_id: str
+):
 
-    if command_id not in command_history:
+    if (
+        command_id
+        not in command_history
+    ):
 
         raise HTTPException(
             status_code=404,
@@ -911,7 +1982,9 @@ def command_status(command_id: str):
         )
 
 
-    return command_history[command_id]
+    return command_history[
+        command_id
+    ]
 
 
 # ============================================================
@@ -923,14 +1996,25 @@ def health():
 
     return {
 
-        "status": "online",
+        "status":
+            "online",
 
-        "robot": ROBOT_ID,
+        "robot":
+            ROBOT_ID,
 
         "queue_length":
-            len(command_queue),
+            len(
+                command_queue
+            ),
 
         "available_commands":
-            len(ALLOWED_COMMANDS)
+            len(
+                ALLOWED_COMMANDS
+            ),
 
+        "version":
+            "2.2",
+
+        "medicine_reminders":
+            True
     }
