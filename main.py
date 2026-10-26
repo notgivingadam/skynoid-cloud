@@ -697,7 +697,7 @@ def home():
                     id="person"
                     class="form-control"
                     type="text"
-                    placeholder="e.g. SkyNoid"
+                    placeholder="e.g. Your Name"
                 >
 
             </div>
@@ -906,6 +906,15 @@ def home():
                 💊 Set Medicine Reminder
             </button>
 
+            <button
+                id="calendarButton"
+                class="button"
+                style="display: none;"
+                onclick="addToPhoneCalendar()"
+            >
+                📱 Add to Phone Calendar
+            </button>
+
 
             <button
                 class="button back-button"
@@ -1013,6 +1022,9 @@ def home():
             ).innerText =
                 "Enter the medicine details.";
 
+            document.getElementById(
+                "calendarButton"
+            ).style.display = "none";
 
             repeatChanged();
         }
@@ -1270,8 +1282,273 @@ def home():
                 status.innerText =
                     "Medicine reminder sent to SkyNoid. "
                     + "SkyNoid will remind you "
-                    + "10 minutes before medicine time.";
+                    + "10 minutes before medicine time. "
+                    + "You can also add it to your phone calendar.";
+
+                document.getElementById(
+                    "calendarButton"
+                ).style.display = "block";
             }
+        }
+
+
+        // ====================================================
+        // ADD TO PHONE CALENDAR
+        // ====================================================
+
+        function addToPhoneCalendar() {
+
+            const status = document.getElementById("status");
+            const person = document.getElementById("person").value.trim();
+            const medicine = document.getElementById("medicine").value.trim();
+            const instruction = document.getElementById("instruction").value.trim();
+            const time = document.getElementById("medicineTime").value;
+            const repeat = document.getElementById("repeatType").value;
+            const date = document.getElementById("medicineDate").value;
+            const selectedDays = [];
+
+            document.querySelectorAll(".medicine-day:checked").forEach(
+                function(item) {
+                    selectedDays.push(item.value);
+                }
+            );
+
+            if (!person || !medicine || !time) {
+                status.innerText = "Please complete the medicine reminder first.";
+                return;
+            }
+
+            const startDate = getCalendarStartDate(
+                date, time, repeat, selectedDays
+            );
+
+            if (!startDate) {
+                status.innerText = "Unable to create the calendar event.";
+                return;
+            }
+
+            const endDate = new Date(startDate.getTime() + 15 * 60 * 1000);
+            const title = "Medicine: " + medicine;
+
+            let description = "Medicine reminder for " + person + ".";
+            if (instruction) {
+                description += " Instruction: " + instruction + ".";
+            }
+            description += " SkyNoid reminder is also set.";
+
+            const uid = Date.now() + "-" +
+                Math.random().toString(36).slice(2) + "@skynoid";
+
+            const lines = [
+                "BEGIN:VCALENDAR",
+                "VERSION:2.0",
+                "PRODID:-//SkyNova Drones//SkyNoid Medicine Reminder//EN",
+                "CALSCALE:GREGORIAN",
+                "METHOD:PUBLISH",
+                "BEGIN:VEVENT",
+                "UID:" + uid,
+                "DTSTAMP:" + formatUTCDate(new Date()),
+                "DTSTART:" + formatLocalDate(startDate),
+                "DTEND:" + formatLocalDate(endDate),
+                "SUMMARY:" + escapeICS(title),
+                "DESCRIPTION:" + escapeICS(description)
+            ];
+
+            const rrule = buildRecurrenceRule(repeat, selectedDays);
+            if (rrule) {
+                lines.push("RRULE:" + rrule);
+            }
+
+            lines.push(
+                "BEGIN:VALARM",
+                "TRIGGER:-PT10M",
+                "ACTION:DISPLAY",
+                "DESCRIPTION:" + escapeICS("Medicine reminder: " + medicine),
+                "END:VALARM",
+                "END:VEVENT",
+                "END:VCALENDAR"
+            );
+
+            const ics = lines.join("\r\n");
+            const blob = new Blob(
+                [ics],
+                {type: "text/calendar;charset=utf-8"}
+            );
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+
+            link.href = url;
+            link.download = safeFileName(
+                "SkyNoid_" + medicine + "_Reminder.ics"
+            );
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            setTimeout(function() {
+                URL.revokeObjectURL(url);
+            }, 1000);
+
+            status.innerText =
+                "Calendar reminder created. Open the downloaded calendar "
+                + "file and save it on your phone. It includes a "
+                + "10-minute alert.";
+        }
+
+
+        // ====================================================
+        // CALENDAR HELPERS
+        // ====================================================
+
+        function getCalendarStartDate(date, time, repeat, selectedDays) {
+
+            const parts = time.split(":");
+            const hour = Number(parts[0]);
+            const minute = Number(parts[1]);
+
+            if (Number.isNaN(hour) || Number.isNaN(minute)) {
+                return null;
+            }
+
+            if (repeat === "once") {
+                if (!date) {
+                    return null;
+                }
+
+                const dateParts = date.split("-");
+                return new Date(
+                    Number(dateParts[0]),
+                    Number(dateParts[1]) - 1,
+                    Number(dateParts[2]),
+                    hour, minute, 0, 0
+                );
+            }
+
+            const now = new Date();
+
+            for (let offset = 0; offset <= 14; offset++) {
+
+                const candidate = new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate() + offset,
+                    hour, minute, 0, 0
+                );
+
+                if (candidate <= now) {
+                    continue;
+                }
+
+                if (repeat === "daily") {
+                    return candidate;
+                }
+
+                const day = candidate.getDay();
+
+                if (repeat === "weekdays" && day >= 1 && day <= 5) {
+                    return candidate;
+                }
+
+                if (repeat === "selected") {
+
+                    const names = [
+                        "sunday", "monday", "tuesday", "wednesday",
+                        "thursday", "friday", "saturday"
+                    ];
+
+                    if (selectedDays.includes(names[day])) {
+                        return candidate;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+
+        function buildRecurrenceRule(repeat, selectedDays) {
+
+            if (repeat === "once") {
+                return "";
+            }
+
+            if (repeat === "daily") {
+                return "FREQ=DAILY";
+            }
+
+            if (repeat === "weekdays") {
+                return "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR";
+            }
+
+            if (repeat === "selected") {
+
+                const codes = {
+                    monday: "MO",
+                    tuesday: "TU",
+                    wednesday: "WE",
+                    thursday: "TH",
+                    friday: "FR",
+                    saturday: "SA",
+                    sunday: "SU"
+                };
+
+                const days = selectedDays
+                    .map(function(day) { return codes[day]; })
+                    .filter(Boolean);
+
+                if (days.length > 0) {
+                    return "FREQ=WEEKLY;BYDAY=" + days.join(",");
+                }
+            }
+
+            return "";
+        }
+
+
+        function formatLocalDate(date) {
+            return (
+                date.getFullYear()
+                + pad2(date.getMonth() + 1)
+                + pad2(date.getDate())
+                + "T"
+                + pad2(date.getHours())
+                + pad2(date.getMinutes())
+                + pad2(date.getSeconds())
+            );
+        }
+
+
+        function formatUTCDate(date) {
+            return (
+                date.getUTCFullYear()
+                + pad2(date.getUTCMonth() + 1)
+                + pad2(date.getUTCDate())
+                + "T"
+                + pad2(date.getUTCHours())
+                + pad2(date.getUTCMinutes())
+                + pad2(date.getUTCSeconds())
+                + "Z"
+            );
+        }
+
+
+        function pad2(value) {
+            return String(value).padStart(2, "0");
+        }
+
+
+        function escapeICS(value) {
+            return String(value)
+                .replace(/\\/g, "\\\\")
+                .replace(/\r?\n/g, "\\n")
+                .replace(/,/g, "\\,")
+                .replace(/;/g, "\\;");
+        }
+
+
+        function safeFileName(value) {
+            return String(value).replace(/[^a-zA-Z0-9._-]+/g, "_");
         }
 
 
