@@ -15,7 +15,7 @@ from pydantic import BaseModel
 app = FastAPI(
     title="SkyNoid Cloud",
     description="Cloud command interface for the SkyNoid robot",
-    version="2.0"
+    version="2.1"
 )
 
 
@@ -54,6 +54,21 @@ ALLOWED_COMMANDS = {
     "ABOUT_SKYNOID",
     "ABOUT_DRONES",
     "ABOUT_SKYNOVA",
+    "PLAY_SONG",
+    "STOP_MUSIC",
+}
+
+
+# ============================================================
+# ALLOWED SONGS
+# ============================================================
+
+ALLOWED_SONGS = {
+    "NATIONAL_ANTHEM",
+    "MERRY_CHRISTMAS",
+    "JINGLE_BELLS",
+    "BENGALI_SONG",
+    "BA_BA_BLACK_SHEEP",
 }
 
 
@@ -63,6 +78,7 @@ ALLOWED_COMMANDS = {
 
 class CommandRequest(BaseModel):
     command: str
+    payload: dict | None = None
 
 
 # ============================================================
@@ -184,6 +200,15 @@ def home():
         }
 
 
+        h2 {
+
+            margin:
+                8px 0 5px 0;
+
+            font-size: 27px;
+        }
+
+
         .subtitle {
 
             color: #c8d9ef;
@@ -241,6 +266,27 @@ def home():
         }
 
 
+        .stop-button {
+
+            background: #ffe8e8;
+
+            color: #8a2020;
+        }
+
+
+        .back-button {
+
+            background:
+                rgba(255, 255, 255, 0.15);
+
+            color: white;
+
+            border:
+                1px solid
+                rgba(255, 255, 255, 0.25);
+        }
+
+
         #status {
 
             min-height: 24px;
@@ -275,61 +321,154 @@ def home():
             🤖
         </div>
 
-        <h1>
-            SKYNOID
-        </h1>
 
-        <div class="subtitle">
-            What would you like to ask me?
+        <!-- ================================================ -->
+        <!-- MAIN MENU                                        -->
+        <!-- ================================================ -->
+
+        <div id="mainMenu">
+
+            <h1>
+                SKYNOID
+            </h1>
+
+            <div class="subtitle">
+                What would you like to ask me?
+            </div>
+
+
+            <button
+                class="button"
+                onclick="sendCommand('TIME')"
+            >
+                🕐 Tell me the current time
+            </button>
+
+
+            <button
+                class="button"
+                onclick="sendCommand('DATE')"
+            >
+                📅 Tell me today's date
+            </button>
+
+
+            <button
+                class="button"
+                onclick="sendCommand('DAY')"
+            >
+                📆 Tell me what day it is
+            </button>
+
+
+            <button
+                class="button"
+                onclick="sendCommand('ABOUT_SKYNOID')"
+            >
+                🤖 Tell me about SkyNoid
+            </button>
+
+
+            <button
+                class="button"
+                onclick="sendCommand('ABOUT_DRONES')"
+            >
+                🚁 Tell me about Drones
+            </button>
+
+
+            <button
+                class="button"
+                onclick="sendCommand('ABOUT_SKYNOVA')"
+            >
+                🏢 Tell me about SkyNova Drones
+            </button>
+
+
+            <button
+                class="button"
+                onclick="showSongMenu()"
+            >
+                🎵 Play a Song
+            </button>
+
         </div>
 
 
-        <button
-            class="button"
-            onclick="sendCommand('TIME')"
+        <!-- ================================================ -->
+        <!-- SONG MENU                                        -->
+        <!-- ================================================ -->
+
+        <div
+            id="songMenu"
+            style="display: none;"
         >
-            🕐 Tell me the current time
-        </button>
+
+            <h2>
+                🎵 PLAY A SONG
+            </h2>
+
+            <div class="subtitle">
+                Select a song for SkyNoid
+            </div>
 
 
-        <button
-            class="button"
-            onclick="sendCommand('DATE')"
-        >
-            📅 Tell me today's date
-        </button>
+            <button
+                class="button"
+                onclick="playSong('NATIONAL_ANTHEM')"
+            >
+                🇮🇳 National Anthem
+            </button>
 
 
-        <button
-            class="button"
-            onclick="sendCommand('DAY')"
-        >
-            📆 Tell me what day it is
-        </button>
+            <button
+                class="button"
+                onclick="playSong('MERRY_CHRISTMAS')"
+            >
+                🎄 Merry Christmas
+            </button>
 
 
-        <button
-            class="button"
-            onclick="sendCommand('ABOUT_SKYNOID')"
-        >
-            🤖 Tell me about SkyNoid
-        </button>
+            <button
+                class="button"
+                onclick="playSong('JINGLE_BELLS')"
+            >
+                🔔 Jingle Bells
+            </button>
 
 
-        <button
-            class="button"
-            onclick="sendCommand('ABOUT_DRONES')"
-        >
-            🚁 Tell me about Drones
-        </button>
+            <button
+                class="button"
+                onclick="playSong('BENGALI_SONG')"
+            >
+                🎵 Bengali Song
+            </button>
 
 
-        <button
-            class="button"
-            onclick="sendCommand('ABOUT_SKYNOVA')"
-        >
-            🏢 Tell me about SkyNova Drones
-        </button>
+            <button
+                class="button"
+                onclick="playSong('BA_BA_BLACK_SHEEP')"
+            >
+                🐑 Ba Ba Black Sheep
+            </button>
+
+
+            <button
+                class="button stop-button"
+                onclick="stopMusic()"
+            >
+                ⏹ Stop Music
+            </button>
+
+
+            <button
+                class="button back-button"
+                onclick="showMainMenu()"
+            >
+                ← Back to Menu
+            </button>
+
+        </div>
 
 
         <div id="status">
@@ -346,13 +485,112 @@ def home():
 
     <script>
 
-        async function sendCommand(command) {
+        // ====================================================
+        // MENU NAVIGATION
+        // ====================================================
+
+        function showSongMenu() {
+
+            document.getElementById(
+                "mainMenu"
+            ).style.display = "none";
+
+
+            document.getElementById(
+                "songMenu"
+            ).style.display = "block";
+
+
+            document.getElementById(
+                "status"
+            ).innerText =
+                "Select a song.";
+
+        }
+
+
+        function showMainMenu() {
+
+            document.getElementById(
+                "songMenu"
+            ).style.display = "none";
+
+
+            document.getElementById(
+                "mainMenu"
+            ).style.display = "block";
+
+
+            document.getElementById(
+                "status"
+            ).innerText =
+                "SkyNoid is ready.";
+
+        }
+
+
+        // ====================================================
+        // PLAY SONG
+        // ====================================================
+
+        function playSong(song) {
+
+            sendCommand(
+                "PLAY_SONG",
+                {
+                    song: song
+                }
+            );
+
+        }
+
+
+        // ====================================================
+        // STOP MUSIC
+        // ====================================================
+
+        function stopMusic() {
+
+            sendCommand(
+                "STOP_MUSIC"
+            );
+
+        }
+
+
+        // ====================================================
+        // SEND COMMAND
+        // ====================================================
+
+        async function sendCommand(
+            command,
+            payload = {}
+        ) {
 
             const status =
                 document.getElementById("status");
 
-            status.innerText =
-                "Sending request to SkyNoid...";
+
+            if (command === "PLAY_SONG") {
+
+                status.innerText =
+                    "Asking SkyNoid to play the song...";
+
+            }
+
+            else if (command === "STOP_MUSIC") {
+
+                status.innerText =
+                    "Stopping music...";
+
+            }
+
+            else {
+
+                status.innerText =
+                    "Sending request to SkyNoid...";
+
+            }
 
 
             try {
@@ -370,7 +608,8 @@ def home():
 
                             body:
                                 JSON.stringify({
-                                    command: command
+                                    command: command,
+                                    payload: payload
                                 })
                         }
                     );
@@ -390,8 +629,26 @@ def home():
                 }
 
 
-                status.innerText =
-                    "Request sent to SkyNoid.";
+                if (command === "PLAY_SONG") {
+
+                    status.innerText =
+                        "Song request sent to SkyNoid.";
+
+                }
+
+                else if (command === "STOP_MUSIC") {
+
+                    status.innerText =
+                        "Stop request sent to SkyNoid.";
+
+                }
+
+                else {
+
+                    status.innerText =
+                        "Request sent to SkyNoid.";
+
+                }
 
             }
 
@@ -421,12 +678,56 @@ def submit_command(request: CommandRequest):
 
     command = request.command.strip().upper()
 
+    payload = request.payload or {}
+
+
     if command not in ALLOWED_COMMANDS:
 
         raise HTTPException(
             status_code=400,
             detail="Invalid SkyNoid command"
         )
+
+
+    # --------------------------------------------------------
+    # VALIDATE SONG
+    # --------------------------------------------------------
+
+    if command == "PLAY_SONG":
+
+        song = str(
+            payload.get(
+                "song",
+                ""
+            )
+        ).strip().upper()
+
+
+        if song not in ALLOWED_SONGS:
+
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid SkyNoid song"
+            )
+
+
+        payload = {
+            "song": song
+        }
+
+
+    # STOP_MUSIC does not require a payload
+
+    elif command == "STOP_MUSIC":
+
+        payload = {}
+
+
+    # Existing commands do not require payloads
+
+    else:
+
+        payload = {}
 
 
     command_id = str(uuid.uuid4())
@@ -437,6 +738,8 @@ def submit_command(request: CommandRequest):
         "id": command_id,
 
         "command": command,
+
+        "payload": payload,
 
         "status": "pending",
 
@@ -457,6 +760,13 @@ def submit_command(request: CommandRequest):
     )
 
 
+    if payload:
+
+        print(
+            f"[QUEUE] Payload: {payload}"
+        )
+
+
     return {
 
         "success": True,
@@ -464,6 +774,8 @@ def submit_command(request: CommandRequest):
         "id": command_id,
 
         "command": command,
+
+        "payload": payload,
 
         "status": "pending"
 
@@ -508,11 +820,25 @@ def get_robot_command(
     )
 
 
+    if item.get("payload"):
+
+        print(
+            f"[ROBOT] Payload: "
+            f"{item['payload']}"
+        )
+
+
     return {
 
         "id": item["id"],
 
         "command": item["command"],
+
+        "payload":
+            item.get(
+                "payload",
+                {}
+            ),
 
         "status": item["status"]
 
