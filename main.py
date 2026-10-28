@@ -59,6 +59,7 @@ ALLOWED_COMMANDS = {
     "PLAY_SONG",
     "STOP_MUSIC",
     "SET_MEDICINE_REMINDER",
+    "DIRECTION",
 }
 
 
@@ -580,6 +581,14 @@ def home():
 
             <button
                 class="button"
+                onclick="showDirectionMenu()"
+            >
+                🧭 Direction Guidance
+            </button>
+
+
+            <button
+                class="button"
                 onclick="showMedicineMenu()"
             >
                 💊 Medicine Reminder
@@ -658,6 +667,39 @@ def home():
                 class="button back-button"
                 onclick="showMainMenu()"
             >
+                ← Back to Menu
+            </button>
+
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- DIRECTION GUIDANCE MENU                           -->
+        <!-- ================================================= -->
+
+        <div id="directionMenu" style="display: none;">
+
+            <h2>
+                🧭 DIRECTION GUIDANCE
+            </h2>
+
+            <div class="subtitle">
+                Where would you like to go?
+            </div>
+
+            <button class="button" onclick="requestDirection('director office')">
+                🏢 Director's Office
+            </button>
+
+            <button class="button" onclick="requestDirection('balcony')">
+                🌿 Balcony
+            </button>
+
+            <button class="button" onclick="requestDirection('washroom')">
+                🚻 Washroom
+            </button>
+
+            <button class="button back-button" onclick="showMainMenu()">
                 ← Back to Menu
             </button>
 
@@ -955,9 +997,17 @@ def home():
                 "songMenu"
             ).style.display = "none";
 
+            document.getElementById(
+                "directionMenu"
+            ).style.display = "none";
+
 
             document.getElementById(
                 "medicineMenu"
+            ).style.display = "none";
+
+            document.getElementById(
+                "directionMenu"
             ).style.display = "none";
 
 
@@ -981,6 +1031,10 @@ def home():
 
             document.getElementById(
                 "medicineMenu"
+            ).style.display = "none";
+
+            document.getElementById(
+                "directionMenu"
             ).style.display = "none";
 
 
@@ -1024,6 +1078,26 @@ def home():
 
 
             repeatChanged();
+        }
+
+
+        // ====================================================
+        // DIRECTION GUIDANCE
+        // ====================================================
+
+        function showDirectionMenu() {
+            document.getElementById("mainMenu").style.display = "none";
+            document.getElementById("songMenu").style.display = "none";
+            document.getElementById("medicineMenu").style.display = "none";
+            document.getElementById("directionMenu").style.display = "block";
+            document.getElementById("status").innerText = "Select a destination.";
+        }
+
+        function requestDirection(destination) {
+            sendCommand(
+                "DIRECTION",
+                { destination: destination }
+            );
         }
 
 
@@ -1385,6 +1459,15 @@ def home():
 
             }
 
+            else if (
+                command === "DIRECTION"
+            ) {
+
+                status.innerText =
+                    "Asking SkyNoid for directions...";
+
+            }
+
             else {
 
                 status.innerText =
@@ -1457,6 +1540,15 @@ def home():
 
                     status.innerText =
                         "Medicine reminder sent to SkyNoid.";
+
+                }
+
+                else if (
+                    command === "DIRECTION"
+                ) {
+
+                    status.innerText =
+                        "Direction request sent to SkyNoid.";
 
                 }
 
@@ -1949,6 +2041,37 @@ def submit_command(
 
             "selected_days":
                 selected_days
+        }
+
+
+    # --------------------------------------------------------
+    # DIRECTION GUIDANCE
+    # --------------------------------------------------------
+
+    elif command == "DIRECTION":
+
+        destination = str(
+            payload.get(
+                "destination",
+                ""
+            )
+        ).strip().lower()
+
+        allowed_destinations = {
+            "director office",
+            "balcony",
+            "washroom",
+        }
+
+        if destination not in allowed_destinations:
+
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid SkyNoid destination"
+            )
+
+        payload = {
+            "destination": destination
         }
 
 
