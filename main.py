@@ -60,6 +60,8 @@ ALLOWED_COMMANDS = {
     "STOP_MUSIC",
     "SET_MEDICINE_REMINDER",
     "DIRECTION",
+    "SKYNOID_QNA",
+    "DRONE_QNA",
 }
 
 
@@ -314,6 +316,104 @@ def home():
             background: #e8fff0;
 
             color: #155b31;
+        }
+
+
+        /* Interactive Q&A buzzer controls */
+        .qna-buzzer-panel {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            margin: 22px 0 8px 0;
+            padding: 18px 12px;
+            border-radius: 20px;
+            background: rgba(4, 18, 42, 0.38);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .qna-buzzer {
+            min-height: 118px;
+            border: none;
+            border-radius: 24px;
+            padding: 15px 10px 13px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: inherit;
+            transition:
+                transform 0.10s ease,
+                box-shadow 0.10s ease,
+                filter 0.10s ease;
+        }
+
+        .qna-buzzer-icon {
+            display: block;
+            font-size: 38px;
+            line-height: 1;
+            margin-bottom: 10px;
+        }
+
+        .qna-buzzer-title {
+            display: block;
+            font-size: 15px;
+            letter-spacing: 0.4px;
+        }
+
+        .qna-skynoid-button {
+            background: linear-gradient(180deg, #eaf5ff, #b8dcff);
+            color: #0b396c;
+            border: 3px solid #78b9f2;
+            box-shadow:
+                0 8px 0 #397db7,
+                0 12px 20px rgba(0, 0, 0, 0.30),
+                inset 0 2px 0 rgba(255, 255, 255, 0.85);
+        }
+
+        .qna-drone-button {
+            background: linear-gradient(180deg, #fff4c9, #ffc95d);
+            color: #654000;
+            border: 3px solid #e8a629;
+            box-shadow:
+                0 8px 0 #a66a00,
+                0 12px 20px rgba(0, 0, 0, 0.30),
+                inset 0 2px 0 rgba(255, 255, 255, 0.80);
+        }
+
+        .qna-buzzer:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.04);
+        }
+
+        .qna-buzzer:active {
+            transform: translateY(7px);
+            box-shadow:
+                0 1px 0 rgba(0, 0, 0, 0.55),
+                0 4px 8px rgba(0, 0, 0, 0.25),
+                inset 0 2px 5px rgba(0, 0, 0, 0.12);
+        }
+
+        @media (max-width: 420px) {
+            .qna-buzzer-panel {
+                gap: 11px;
+                padding: 14px 8px;
+            }
+
+            .qna-buzzer {
+                min-height: 108px;
+                padding: 13px 7px 11px;
+            }
+
+            .qna-buzzer-icon {
+                font-size: 34px;
+            }
+
+            .qna-buzzer-title {
+                font-size: 13px;
+            }
+        }
+
+        .question-button {
+            text-align: left;
+            line-height: 1.35;
         }
 
 
@@ -594,6 +694,30 @@ def home():
                 💊 Medicine Reminder
             </button>
 
+
+            <!-- INTERACTIVE Q&A BUZZERS -->
+            <div class="qna-buzzer-panel">
+
+                <button
+                    class="qna-buzzer qna-skynoid-button"
+                    onclick="showSkynoidQnaMenu()"
+                    aria-label="Ask SkyNoid"
+                >
+                    <span class="qna-buzzer-icon">🤖</span>
+                    <span class="qna-buzzer-title">ASK SKYNOID</span>
+                </button>
+
+                <button
+                    class="qna-buzzer qna-drone-button"
+                    onclick="showDroneQnaMenu()"
+                    aria-label="Ask about drones"
+                >
+                    <span class="qna-buzzer-icon">🚁</span>
+                    <span class="qna-buzzer-title">ASK ABOUT DRONES</span>
+                </button>
+
+            </div>
+
         </div>
 
 
@@ -705,6 +829,173 @@ def home():
 
         </div>
 
+
+
+        <!-- ================================================= -->
+        <!-- 🤖 SKYNOID Q&amp;A -->
+        <!-- ================================================= -->
+
+        <div id="skynoidQnaMenu" style="display: none;">
+
+            <h2>
+                🤖 SKYNOID Q&amp;A
+            </h2>
+
+            <div class="subtitle">
+                Select a question and SkyNoid will answer it.
+            </div>
+
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_01')">
+                1. What is your name?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_02')">
+                2. Who made you?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_03')">
+                3. Are you a robot or a drone?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_04')">
+                4. What can you do?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_05')">
+                5. Will you be my friend?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_06')">
+                6. How are you today?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_07')">
+                7. How do you see me?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_08')">
+                8. How do you hear me?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_09')">
+                9. How do you talk?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_10')">
+                10. How do you know someone is nearby?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_11')">
+                11. Can you remember me?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_12')">
+                12. Can you tell me the time or date?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_13')">
+                13. Can you teach me about drones?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_14')">
+                14. Can you remind me to do something?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_15')">
+                15. Can you take a selfie with me?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_16')">
+                16. Can you play songs?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_17')">
+                17. Can you understand hand gestures?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_18')">
+                18. What happens if I gently pat you?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_19')">
+                19. Do you eat or sleep?
+            </button>
+            <button class="button question-button" onclick="askQna('SKYNOID_QNA', 'SKYNOID_20')">
+                20. Do you know everything?
+            </button>
+
+            <button class="button back-button" onclick="showMainMenu()">
+                ← Back to Menu
+            </button>
+
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- 🚁 DRONE Q&amp;A -->
+        <!-- ================================================= -->
+
+        <div id="droneQnaMenu" style="display: none;">
+
+            <h2>
+                🚁 DRONE Q&amp;A
+            </h2>
+
+            <div class="subtitle">
+                Select a drone question and SkyNoid will answer it.
+            </div>
+
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_01')">
+                1. What is a drone?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_02')">
+                2. Is a drone a robot?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_03')">
+                3. How does a drone fly?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_04')">
+                4. What is a propeller?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_05')">
+                5. What is a rotor?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_06')">
+                6. What is a quadcopter?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_07')">
+                7. Are all drones the same?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_08')">
+                8. How does a drone know where it is?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_09')">
+                9. Can a drone fly by itself?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_10')">
+                10. What can drones do besides take photos?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_11')">
+                11. How do drones help farmers?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_12')">
+                12. Can a drone tell whether a plant is sick?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_13')">
+                13. How do drones make maps?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_14')">
+                14. Can drones help during disasters?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_15')">
+                15. Can drones see in the dark?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_16')">
+                16. Can drones deliver things?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_17')">
+                17. How long can a drone fly?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_18')">
+                18. What happens when its battery gets low?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_19')">
+                19. Can drones avoid every obstacle?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_20')">
+                20. What should I do if I see a drone nearby?
+            </button>
+            <button class="button question-button" onclick="askQna('DRONE_QNA', 'DRONE_21')">
+                21. What kind of drones will SkyNova Drones make?
+            </button>
+
+            <button class="button back-button" onclick="showMainMenu()">
+                ← Back to Menu
+            </button>
+
+        </div>
 
         <!-- ================================================= -->
         <!-- MEDICINE REMINDER MENU                            -->
@@ -1006,6 +1297,15 @@ def home():
                 "medicineMenu"
             ).style.display = "none";
 
+
+            document.getElementById(
+                "skynoidQnaMenu"
+            ).style.display = "none";
+
+            document.getElementById(
+                "droneQnaMenu"
+            ).style.display = "none";
+
             document.getElementById(
                 "directionMenu"
             ).style.display = "none";
@@ -1097,6 +1397,41 @@ def home():
             sendCommand(
                 "DIRECTION",
                 { destination: destination }
+            );
+        }
+
+
+        // ====================================================
+        // Q&A MENUS
+        // ====================================================
+
+        function hideAllMenus() {
+            document.getElementById("mainMenu").style.display = "none";
+            document.getElementById("songMenu").style.display = "none";
+            document.getElementById("directionMenu").style.display = "none";
+            document.getElementById("medicineMenu").style.display = "none";
+            document.getElementById("skynoidQnaMenu").style.display = "none";
+            document.getElementById("droneQnaMenu").style.display = "none";
+        }
+
+        function showSkynoidQnaMenu() {
+            hideAllMenus();
+            document.getElementById("skynoidQnaMenu").style.display = "block";
+            document.getElementById("status").innerText =
+                "Select a question about SkyNoid.";
+        }
+
+        function showDroneQnaMenu() {
+            hideAllMenus();
+            document.getElementById("droneQnaMenu").style.display = "block";
+            document.getElementById("status").innerText =
+                "Select a question about drones.";
+        }
+
+        function askQna(command, questionId) {
+            sendCommand(
+                command,
+                { question_id: questionId }
             );
         }
 
@@ -1468,6 +1803,16 @@ def home():
 
             }
 
+            else if (
+                command === "SKYNOID_QNA"
+                || command === "DRONE_QNA"
+            ) {
+
+                status.innerText =
+                    "Asking SkyNoid the selected question...";
+
+            }
+
             else {
 
                 status.innerText =
@@ -1549,6 +1894,16 @@ def home():
 
                     status.innerText =
                         "Direction request sent to SkyNoid.";
+
+                }
+
+                else if (
+                    command === "SKYNOID_QNA"
+                    || command === "DRONE_QNA"
+                ) {
+
+                    status.innerText =
+                        "Question sent to SkyNoid.";
 
                 }
 
@@ -2072,6 +2427,48 @@ def submit_command(
 
         payload = {
             "destination": destination
+        }
+
+
+    # --------------------------------------------------------
+    # SKYNOID / DRONE Q&A
+    # --------------------------------------------------------
+
+    elif command in {"SKYNOID_QNA", "DRONE_QNA"}:
+
+        question_id = str(
+            payload.get(
+                "question_id",
+                ""
+            )
+        ).strip().upper()
+
+        prefix = (
+            "SKYNOID_"
+            if command == "SKYNOID_QNA"
+            else "DRONE_"
+        )
+
+        maximum = (
+            20
+            if command == "SKYNOID_QNA"
+            else 21
+        )
+
+        valid_question_ids = {
+            f"{prefix}{number:02d}"
+            for number in range(1, maximum + 1)
+        }
+
+        if question_id not in valid_question_ids:
+
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid SkyNoid Q&A question"
+            )
+
+        payload = {
+            "question_id": question_id
         }
 
 
