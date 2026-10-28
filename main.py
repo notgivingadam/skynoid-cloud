@@ -1637,7 +1637,7 @@ def download_calendar(
         "END:VCALENDAR",
     ])
 
-    calendar_text = "\\r\\n".join(lines) + "\\r\\n"
+    calendar_text = "\r\n".join(lines) + "\r\n"
     filename = safe_calendar_filename(
         f"SkyNoid_{medicine}_Reminder"
     ) + ".ics"
