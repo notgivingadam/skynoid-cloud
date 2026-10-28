@@ -1,11 +1,12 @@
 import os
 import uuid
+import re
 
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
 
@@ -908,6 +909,14 @@ def home():
 
 
             <button
+                class="button"
+                onclick="downloadMedicineCalendar()"
+            >
+                📱 Add to Phone Calendar
+            </button>
+
+
+            <button
                 class="button back-button"
                 onclick="showMainMenu()"
             >
@@ -1276,6 +1285,62 @@ def home():
 
 
         // ====================================================
+        // DOWNLOAD PHONE CALENDAR
+        // ====================================================
+
+        function downloadMedicineCalendar() {
+            const status = document.getElementById("status");
+            const person = document.getElementById("person").value.trim();
+            const medicine = document.getElementById("medicine").value.trim();
+            const instruction = document.getElementById("instruction").value.trim();
+            const time = document.getElementById("medicineTime").value;
+            const repeat = document.getElementById("repeatType").value;
+            const date = document.getElementById("medicineDate").value;
+            const selectedDays = [];
+
+            document.querySelectorAll(".medicine-day:checked").forEach(
+                function(item) {
+                    selectedDays.push(item.value);
+                }
+            );
+
+            if (!person) {
+                status.innerText = "Please enter the person's name.";
+                return;
+            }
+            if (!medicine) {
+                status.innerText = "Please enter the medicine name.";
+                return;
+            }
+            if (!time) {
+                status.innerText = "Please select the medicine time.";
+                return;
+            }
+            if (repeat === "once" && !date) {
+                status.innerText = "Please select the medicine date.";
+                return;
+            }
+            if (repeat === "selected" && selectedDays.length === 0) {
+                status.innerText = "Please select at least one day.";
+                return;
+            }
+
+            const params = new URLSearchParams({
+                person: person,
+                medicine: medicine,
+                instruction: instruction,
+                time: time,
+                repeat: repeat,
+                date: date,
+                selected_days: selectedDays.join(",")
+            });
+
+            status.innerText = "Creating phone calendar file...";
+            window.location.href = "/calendar?" + params.toString();
+        }
+
+
+        // ====================================================
         // SEND COMMAND
         // ====================================================
 
@@ -1428,6 +1493,162 @@ def home():
 
 </html>
 """
+
+
+# ============================================================
+# PHONE CALENDAR DOWNLOAD
+# ============================================================
+
+def escape_ics_text(value: str) -> str:
+    return (
+        str(value)
+        .replace("\\", "\\\\")
+        .replace("\r", "")
+        .replace("\n", "\\n")
+        .replace(",", "\\,")
+        .replace(";", "\\;")
+    )
+
+
+def safe_calendar_filename(value: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value)).strip("_")
+    return cleaned or "SkyNoid_Medicine_Reminder"
+
+
+@app.get("/calendar")
+def download_calendar(
+    person: str,
+    medicine: str,
+    time: str,
+    repeat: str = "once",
+    date: str = "",
+    instruction: str = "",
+    selected_days: str = ""
+):
+    person = person.strip()
+    medicine = medicine.strip()
+    instruction = instruction.strip()
+    repeat = repeat.strip().lower()
+    date = date.strip()
+
+    if not person:
+        raise HTTPException(status_code=400, detail="Person name is required")
+    if not medicine:
+        raise HTTPException(status_code=400, detail="Medicine name is required")
+
+    try:
+        hour_text, minute_text = time.split(":")
+        hour, minute = int(hour_text), int(minute_text)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid medicine time")
+
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        raise HTTPException(status_code=400, detail="Invalid medicine time")
+    if repeat not in ALLOWED_REPEAT_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid repeat option")
+
+    day_codes = {
+        "monday": "MO", "tuesday": "TU", "wednesday": "WE",
+        "thursday": "TH", "friday": "FR", "saturday": "SA",
+        "sunday": "SU"
+    }
+    weekday_numbers = {
+        "monday": 0, "tuesday": 1, "wednesday": 2,
+        "thursday": 3, "friday": 4, "saturday": 5,
+        "sunday": 6
+    }
+    chosen_days = [
+        x.strip().lower() for x in selected_days.split(",") if x.strip()
+    ]
+
+    if repeat == "selected":
+        if not chosen_days:
+            raise HTTPException(status_code=400, detail="Select at least one day")
+        if any(day not in ALLOWED_DAYS for day in chosen_days):
+            raise HTTPException(status_code=400, detail="Invalid selected day")
+
+    now = datetime.now()
+
+    if repeat == "once":
+        if not date:
+            raise HTTPException(status_code=400, detail="Medicine date is required")
+        try:
+            start = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid medicine date")
+    else:
+        base = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        allowed = None
+        if repeat == "weekdays":
+            allowed = {0, 1, 2, 3, 4}
+        elif repeat == "selected":
+            allowed = {weekday_numbers[d] for d in chosen_days}
+
+        start = None
+        for offset in range(15):
+            candidate = base + timedelta(days=offset)
+            if candidate <= now:
+                continue
+            if allowed is None or candidate.weekday() in allowed:
+                start = candidate
+                break
+        if start is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Unable to determine calendar date"
+            )
+
+    end = start + timedelta(minutes=15)
+    description = f"Medicine reminder for {person}."
+    if instruction:
+        description += f" {instruction}."
+
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//SkyNova Drones//SkyNoid//EN",
+        "CALSCALE:GREGORIAN",
+        "BEGIN:VEVENT",
+        f"UID:{uuid.uuid4()}@skynoid",
+        f"DTSTAMP:{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}",
+        f"DTSTART:{start.strftime('%Y%m%dT%H%M%S')}",
+        f"DTEND:{end.strftime('%Y%m%dT%H%M%S')}",
+        f"SUMMARY:{escape_ics_text('Medicine: ' + medicine)}",
+        f"DESCRIPTION:{escape_ics_text(description)}",
+    ]
+
+    if repeat == "daily":
+        lines.append("RRULE:FREQ=DAILY")
+    elif repeat == "weekdays":
+        lines.append("RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR")
+    elif repeat == "selected":
+        lines.append(
+            "RRULE:FREQ=WEEKLY;BYDAY="
+            + ",".join(day_codes[d] for d in chosen_days)
+        )
+
+    lines.extend([
+        "BEGIN:VALARM",
+        "TRIGGER:-PT10M",
+        "ACTION:DISPLAY",
+        f"DESCRIPTION:{escape_ics_text('Medicine reminder: ' + medicine)}",
+        "END:VALARM",
+        "END:VEVENT",
+        "END:VCALENDAR",
+    ])
+
+    calendar_text = "\\r\\n".join(lines) + "\\r\\n"
+    filename = safe_calendar_filename(
+        f"SkyNoid_{medicine}_Reminder"
+    ) + ".ics"
+
+    return Response(
+        content=calendar_text,
+        media_type="text/calendar; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
 
 
 # ============================================================
