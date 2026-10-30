@@ -5,7 +5,7 @@ import re
 from collections import deque
 from datetime import datetime, timedelta
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
@@ -45,12 +45,6 @@ command_queue = deque()
 command_history = {}
 
 
-# ============================================================
-# MOOD LIVE VIEW STORAGE
-# ============================================================
-
-latest_mood_frame = None
-latest_mood_frame_at = None
 
 
 # ============================================================
@@ -705,41 +699,6 @@ def home():
             margin-top: 14px;
         }
 
-
-        /* MOOD LIVE CAMERA VIEW */
-        .mood-viewer {
-            display: none;
-            margin: 12px 0 18px 0;
-            padding: 12px;
-            border-radius: 16px;
-            background: rgba(4, 18, 42, 0.55);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-        }
-
-        .mood-viewer.active { display: block; }
-
-        .mood-viewer-title {
-            font-size: 14px;
-            font-weight: bold;
-            margin-bottom: 9px;
-            color: #dcecff;
-        }
-
-        .mood-camera-frame {
-            display: block;
-            width: 100%;
-            min-height: 180px;
-            border-radius: 12px;
-            background: #07152e;
-            object-fit: contain;
-        }
-
-        .mood-viewer-note {
-            margin-top: 8px;
-            color: #a9c5e5;
-            font-size: 12px;
-        }
-
     </style>
 
 </head>
@@ -843,24 +802,10 @@ def home():
 
             <button
                 class="button"
-                onclick="startMoodCheck()"
+                onclick="sendCommand('GUESS_MOOD')"
             >
                 😊 Guess My Mood
             </button>
-
-            <div id="moodViewer" class="mood-viewer">
-                <div class="mood-viewer-title">
-                    📷 SkyNoid Camera — Live View
-                </div>
-                <img
-                    id="moodCameraFrame"
-                    class="mood-camera-frame"
-                    alt="Live view from SkyNoid Camera Module 3"
-                >
-                <div class="mood-viewer-note">
-                    Live view while SkyNoid checks your facial expression.
-                </div>
-            </div>
 
 
             <!-- INTERACTIVE Q&A BUZZERS -->
@@ -2145,65 +2090,6 @@ def home():
 
 
         // ====================================================
-        // GUESS MY MOOD LIVE VIEW
-        // ====================================================
-
-        let moodFrameTimer = null;
-        let moodStopTimer = null;
-
-        function stopMoodViewer() {
-            if (moodFrameTimer !== null) {
-                clearInterval(moodFrameTimer);
-                moodFrameTimer = null;
-            }
-
-            if (moodStopTimer !== null) {
-                clearTimeout(moodStopTimer);
-                moodStopTimer = null;
-            }
-
-            document.getElementById(
-                "moodViewer"
-            ).classList.remove("active");
-        }
-
-        function refreshMoodFrame() {
-            document.getElementById(
-                "moodCameraFrame"
-            ).src = "/mood/frame?t=" + Date.now();
-        }
-
-        async function startMoodCheck() {
-            stopMoodViewer();
-
-            document.getElementById(
-                "moodViewer"
-            ).classList.add("active");
-
-            refreshMoodFrame();
-
-            moodFrameTimer = setInterval(
-                refreshMoodFrame,
-                500
-            );
-
-            const success = await sendCommand(
-                "GUESS_MOOD"
-            );
-
-            if (!success) {
-                stopMoodViewer();
-                return;
-            }
-
-            moodStopTimer = setTimeout(
-                stopMoodViewer,
-                12000
-            );
-        }
-
-
-        // ====================================================
         // SEND COMMAND
         // ====================================================
 
@@ -2272,7 +2158,7 @@ def home():
             ) {
 
                 status.innerText =
-                    "Starting SkyNoid facial-expression detection...";
+                    "Asking SkyNoid to guess your mood...";
 
             }
 
@@ -2569,59 +2455,6 @@ def download_calendar(
         }
     )
 
-
-# ============================================================
-# MOOD LIVE CAMERA FRAME
-# ============================================================
-
-@app.post("/robot/mood/frame")
-async def upload_mood_frame(
-    request: Request,
-    authorization: str | None = Header(default=None)
-):
-
-    global latest_mood_frame
-    global latest_mood_frame_at
-
-    authenticate_robot(authorization)
-
-    frame = await request.body()
-
-    if not frame:
-        raise HTTPException(
-            status_code=400,
-            detail="Empty camera frame"
-        )
-
-    if len(frame) > 500_000:
-        raise HTTPException(
-            status_code=413,
-            detail="Camera frame is too large"
-        )
-
-    latest_mood_frame = bytes(frame)
-    latest_mood_frame_at = datetime.utcnow()
-
-    return {
-        "success": True,
-        "bytes": len(frame)
-    }
-
-
-@app.get("/mood/frame")
-def get_mood_frame():
-
-    if latest_mood_frame is None:
-        return Response(status_code=204)
-
-    return Response(
-        content=latest_mood_frame,
-        media_type="image/jpeg",
-        headers={
-            "Cache-Control":
-                "no-store, no-cache, must-revalidate, max-age=0"
-        }
-    )
 
 
 # ============================================================
