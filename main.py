@@ -62,6 +62,7 @@ ALLOWED_COMMANDS = {
     "DIRECTION",
     "SKYNOID_QNA",
     "DRONE_QNA",
+    "GUESS_MOOD",
 }
 
 
@@ -594,6 +595,108 @@ def home():
             color: #8faac8;
         }
 
+    
+        /* ================================================= */
+        /* ILLUSTRATIVE DIRECTION ROUTE MAPS                 */
+        /* ================================================= */
+
+        .route-map-card {
+            display: none;
+            margin-top: 18px;
+            padding: 18px 14px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            text-align: left;
+        }
+
+        .route-map-card.active {
+            display: block;
+        }
+
+        .route-map-title {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .route-map-subtitle {
+            text-align: center;
+            color: #a9c5e5;
+            font-size: 12px;
+            margin-bottom: 16px;
+        }
+
+        .route-diagram {
+            position: relative;
+            overflow: hidden;
+            border-radius: 16px;
+            padding: 18px 12px;
+            background: linear-gradient(180deg, #f7fbff, #e7f2ff);
+            color: #102b52;
+            border: 2px solid #9dc7ef;
+        }
+
+        .route-step {
+            position: relative;
+            z-index: 2;
+            width: 88%;
+            margin: 0 auto;
+            padding: 10px 10px;
+            border-radius: 12px;
+            background: white;
+            border: 2px solid #b8d4ec;
+            text-align: center;
+            font-size: 13px;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(16, 43, 82, 0.12);
+        }
+
+        .route-start {
+            background: #e7f8ee;
+            border-color: #79c89b;
+            color: #155b31;
+        }
+
+        .route-destination {
+            background: #fff1cc;
+            border-color: #efb84c;
+            color: #684500;
+        }
+
+        .route-arrow {
+            text-align: center;
+            font-size: 24px;
+            line-height: 1;
+            color: #2877bd;
+            margin: 5px 0;
+            font-weight: bold;
+        }
+
+        .route-instruction {
+            text-align: center;
+            color: #315f86;
+            font-size: 11px;
+            font-weight: bold;
+            margin: -1px 0 5px 0;
+        }
+
+        .route-spoken-note {
+            margin-top: 13px;
+            padding: 10px 12px;
+            border-radius: 11px;
+            background: rgba(120, 184, 255, 0.12);
+            color: #dcecff;
+            font-size: 12px;
+            line-height: 1.45;
+            text-align: center;
+        }
+
+        .route-back-button {
+            margin-top: 14px;
+        }
+
     </style>
 
 </head>
@@ -692,6 +795,14 @@ def home():
                 onclick="showMedicineMenu()"
             >
                 💊 Medicine Reminder
+            </button>
+
+
+            <button
+                class="button"
+                onclick="sendCommand('GUESS_MOOD')"
+            >
+                😊 Guess My Mood
             </button>
 
 
@@ -803,29 +914,59 @@ def home():
 
         <div id="directionMenu" style="display: none;">
 
-            <h2>
-                🧭 DIRECTION GUIDANCE
-            </h2>
+            <div id="directionChoices">
 
-            <div class="subtitle">
-                Where would you like to go?
+                <h2>
+                    🧭 DIRECTION GUIDANCE
+                </h2>
+
+                <div class="subtitle">
+                    Where would you like to go?
+                </div>
+
+                <button class="button" onclick="requestDirection('director office')">
+                    🏢 Director's Office
+                </button>
+
+                <button class="button" onclick="requestDirection('balcony')">
+                    🌿 Balcony
+                </button>
+
+                <button class="button" onclick="requestDirection('washroom')">
+                    🚻 Washroom
+                </button>
+
+                <button class="button back-button" onclick="showMainMenu()">
+                    ← Back to Menu
+                </button>
+
             </div>
 
-            <button class="button" onclick="requestDirection('director office')">
-                🏢 Director's Office
-            </button>
 
-            <button class="button" onclick="requestDirection('balcony')">
-                🌿 Balcony
-            </button>
+            <div id="directionMap" class="route-map-card">
 
-            <button class="button" onclick="requestDirection('washroom')">
-                🚻 Washroom
-            </button>
+                <div id="routeMapTitle" class="route-map-title">
+                    Route Guide
+                </div>
 
-            <button class="button back-button" onclick="showMainMenu()">
-                ← Back to Menu
-            </button>
+                <div class="route-map-subtitle">
+                    Illustrative Route Guide • Not to scale
+                </div>
+
+                <div id="routeMapContent"></div>
+
+                <div class="route-spoken-note">
+                    🔊 SkyNoid is also speaking these directions.
+                </div>
+
+                <button
+                    class="button back-button route-back-button"
+                    onclick="backToDirectionChoices()"
+                >
+                    ← Back to Directions
+                </button>
+
+            </div>
 
         </div>
 
@@ -1389,15 +1530,211 @@ def home():
             document.getElementById("mainMenu").style.display = "none";
             document.getElementById("songMenu").style.display = "none";
             document.getElementById("medicineMenu").style.display = "none";
+            document.getElementById("skynoidQnaMenu").style.display = "none";
+            document.getElementById("droneQnaMenu").style.display = "none";
             document.getElementById("directionMenu").style.display = "block";
-            document.getElementById("status").innerText = "Select a destination.";
+
+            backToDirectionChoices();
+
+            document.getElementById("status").innerText =
+                "Select a destination.";
         }
 
+
+        function backToDirectionChoices() {
+            document.getElementById("directionChoices").style.display = "block";
+
+            const map = document.getElementById("directionMap");
+            map.classList.remove("active");
+
+            document.getElementById("routeMapContent").innerHTML = "";
+        }
+
+
         function requestDirection(destination) {
+
+            // Keep the existing robot command exactly as before.
             sendCommand(
                 "DIRECTION",
                 { destination: destination }
             );
+
+            // Also show an illustrative route guide on the phone.
+            showDirectionMap(destination);
+        }
+
+
+        function showDirectionMap(destination) {
+
+            const title = document.getElementById("routeMapTitle");
+            const content = document.getElementById("routeMapContent");
+            const choices = document.getElementById("directionChoices");
+            const map = document.getElementById("directionMap");
+
+            let routeHtml = "";
+
+
+            if (destination === "director office") {
+
+                title.innerText = "🏢 Director's Office";
+
+                routeHtml = `
+                    <div class="route-diagram">
+
+                        <div class="route-step route-start">
+                            🤖 YOU ARE HERE<br>
+                            <span style="font-weight:normal;">SkyNoid / Seating Area</span>
+                        </div>
+
+                        <div class="route-arrow">↓</div>
+                        <div class="route-instruction">Open this door</div>
+
+                        <div class="route-step">
+                            🚪 BEWARE OF DOG
+                            <br>
+                            <span style="font-weight:normal;">
+                                Don't worry — the dog is not inside this door.
+                            </span>
+                        </div>
+
+                        <div class="route-arrow">↓</div>
+                        <div class="route-instruction">
+                            Walk straight to the other end
+                        </div>
+
+                        <div class="route-step">
+                            🪟 WINDOW
+                        </div>
+
+                        <div class="route-arrow">↙</div>
+                        <div class="route-instruction">
+                            Door on your left
+                        </div>
+
+                        <div class="route-step route-destination">
+                            🚪 DIRECTOR'S OFFICE
+                            <br>
+                            <span style="font-weight:normal;">
+                                Knock and wait for a response.
+                            </span>
+                        </div>
+
+                    </div>
+                `;
+            }
+
+
+            else if (destination === "balcony") {
+
+                title.innerText = "🌿 Balcony";
+
+                routeHtml = `
+                    <div class="route-diagram">
+
+                        <div class="route-step route-start">
+                            🤖 YOU ARE HERE<br>
+                            <span style="font-weight:normal;">SkyNoid / Seating Area</span>
+                        </div>
+
+                        <div class="route-arrow">↓</div>
+                        <div class="route-instruction">
+                            Face this door
+                        </div>
+
+                        <div class="route-step">
+                            🚪 BEWARE OF DOG
+                        </div>
+
+                        <div class="route-arrow">↘</div>
+                        <div class="route-instruction">
+                            Turn right
+                        </div>
+
+                        <div class="route-step">
+                            🚪 DOOR AT THE END
+                            <br>
+                            <span style="font-weight:normal;">Open the door</span>
+                        </div>
+
+                        <div class="route-arrow">↓</div>
+
+                        <div class="route-step route-destination">
+                            🌿 BALCONY
+                        </div>
+
+                    </div>
+                `;
+            }
+
+
+            else if (destination === "washroom") {
+
+                title.innerText = "🚻 Washroom";
+
+                routeHtml = `
+                    <div class="route-diagram">
+
+                        <div class="route-step route-start">
+                            🤖 YOU ARE HERE<br>
+                            <span style="font-weight:normal;">SkyNoid / Seating Area</span>
+                        </div>
+
+                        <div class="route-arrow">↓</div>
+                        <div class="route-instruction">
+                            Face this door
+                        </div>
+
+                        <div class="route-step">
+                            🚪 BEWARE OF DOG
+                        </div>
+
+                        <div class="route-arrow">↙</div>
+                        <div class="route-instruction">
+                            Turn left
+                        </div>
+
+                        <div class="route-step">
+                            🚰 WASH BASIN AREA
+                            <br>
+                            <span style="font-weight:normal;">
+                                Walk until you reach the end.
+                            </span>
+                        </div>
+
+                        <div class="route-arrow">↙</div>
+                        <div class="route-instruction">
+                            Door on your left
+                        </div>
+
+                        <div class="route-step route-destination">
+                            🚻 WASHROOM
+                        </div>
+
+                    </div>
+                `;
+            }
+
+
+            else {
+                title.innerText = "Route Guide";
+
+                routeHtml = `
+                    <div class="route-diagram">
+                        <div class="route-step">
+                            Route unavailable.
+                        </div>
+                    </div>
+                `;
+            }
+
+
+            content.innerHTML = routeHtml;
+
+            choices.style.display = "none";
+            map.classList.add("active");
+
+            document.getElementById("status").innerText =
+                "Route displayed. SkyNoid is giving the directions.";
         }
 
 
@@ -1813,6 +2150,15 @@ def home():
 
             }
 
+            else if (
+                command === "GUESS_MOOD"
+            ) {
+
+                status.innerText =
+                    "Starting SkyNoid facial-expression detection...";
+
+            }
+
             else {
 
                 status.innerText =
@@ -1904,6 +2250,15 @@ def home():
 
                     status.innerText =
                         "Question sent to SkyNoid.";
+
+                }
+
+                else if (
+                    command === "GUESS_MOOD"
+                ) {
+
+                    status.innerText =
+                        "Guess My Mood request sent to SkyNoid.";
 
                 }
 
