@@ -5,7 +5,7 @@ import re
 from collections import deque
 from datetime import datetime, timedelta
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, File, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
@@ -17,7 +17,7 @@ from pydantic import BaseModel
 app = FastAPI(
     title="SkyNoid Cloud",
     description="Cloud command interface for the SkyNoid robot",
-    version="2.2"
+    version="2.3"
 )
 
 
@@ -44,6 +44,11 @@ command_queue = deque()
 
 command_history = {}
 
+# Latest selfie is held only in cloud process memory.
+latest_selfie_bytes = None
+latest_selfie_version = 0
+latest_selfie_at = None
+
 
 
 
@@ -65,6 +70,7 @@ ALLOWED_COMMANDS = {
     "SKYNOID_QNA",
     "DRONE_QNA",
     "GUESS_MOOD",
+    "TAKE_SELFIE",
 }
 
 
@@ -326,19 +332,19 @@ def home():
         .qna-buzzer-panel {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 16px;
-            margin: 22px 0 8px 0;
-            padding: 18px 12px;
+            gap: 11px;
+            margin: 18px 0 8px 0;
+            padding: 12px 9px;
             border-radius: 20px;
             background: rgba(4, 18, 42, 0.38);
             border: 1px solid rgba(255, 255, 255, 0.12);
         }
 
         .qna-buzzer {
-            min-height: 118px;
+            min-height: 92px;
             border: none;
-            border-radius: 24px;
-            padding: 15px 10px 13px;
+            border-radius: 20px;
+            padding: 11px 7px 10px;
             cursor: pointer;
             font-weight: bold;
             font-family: inherit;
@@ -350,14 +356,14 @@ def home():
 
         .qna-buzzer-icon {
             display: block;
-            font-size: 38px;
+            font-size: 31px;
             line-height: 1;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
         .qna-buzzer-title {
             display: block;
-            font-size: 15px;
+            font-size: 13px;
             letter-spacing: 0.4px;
         }
 
@@ -379,6 +385,35 @@ def home():
                 0 8px 0 #a66a00,
                 0 12px 20px rgba(0, 0, 0, 0.30),
                 inset 0 2px 0 rgba(255, 255, 255, 0.80);
+        }
+
+        .qna-selfie-button {
+            background: linear-gradient(180deg, #f3eaff, #d5b7ff);
+            color: #4d2176;
+            border: 3px solid #ad7ae3;
+            box-shadow: 0 8px 0 #7445a8, 0 12px 20px rgba(0,0,0,0.30);
+        }
+
+        .qna-sign-button {
+            background: linear-gradient(180deg, #e8fff0, #aee7c2);
+            color: #155b31;
+            border: 3px solid #69bd88;
+            box-shadow: 0 8px 0 #3f8659, 0 12px 20px rgba(0,0,0,0.30);
+        }
+
+        .selfie-card {
+            margin-top: 18px;
+            padding: 14px;
+            border-radius: 18px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.16);
+        }
+
+        .selfie-photo {
+            width: 100%;
+            display: block;
+            border-radius: 14px;
+            margin-bottom: 12px;
         }
 
         .qna-buzzer:hover {
@@ -829,6 +864,24 @@ def home():
                     <span class="qna-buzzer-title">ASK ABOUT DRONES</span>
                 </button>
 
+                <button
+                    class="qna-buzzer qna-selfie-button"
+                    onclick="takeSelfie()"
+                    aria-label="Take a selfie"
+                >
+                    <span class="qna-buzzer-icon">📸</span>
+                    <span class="qna-buzzer-title">TAKE A SELFIE</span>
+                </button>
+
+                <button
+                    class="qna-buzzer qna-sign-button"
+                    onclick="signLanguageComingSoon()"
+                    aria-label="Learn sign language"
+                >
+                    <span class="qna-buzzer-icon">🤟</span>
+                    <span class="qna-buzzer-title">LEARN SIGN LANGUAGE</span>
+                </button>
+
             </div>
 
         </div>
@@ -1141,6 +1194,35 @@ def home():
         </div>
 
         <!-- ================================================= -->
+        <!-- 📸 SELFIE                                         -->
+        <!-- ================================================= -->
+
+        <div id="selfieMenu" style="display: none;">
+            <h2>📸 YOUR SELFIE</h2>
+            <div class="subtitle">
+                Your photo will appear here after SkyNoid captures it.
+            </div>
+            <div class="selfie-card">
+                <img id="selfiePhoto" class="selfie-photo"
+                     alt="SkyNoid selfie" style="display:none;">
+                <div id="selfieWaiting">Waiting for SkyNoid...</div>
+                <a id="selfieDownload" class="button" href="#"
+                   download="SkyNoid_Selfie.jpg"
+                   style="display:none; text-decoration:none;">
+                    ⬇ Download Selfie
+                </a>
+                <button id="selfieAgain" class="button"
+                        onclick="takeSelfie()" style="display:none;">
+                    📸 Take Another Selfie
+                </button>
+            </div>
+            <button class="button back-button" onclick="showMainMenu()">
+                ← Back to Menu
+            </button>
+        </div>
+
+
+        <!-- ================================================= -->
         <!-- MEDICINE REMINDER MENU                            -->
         <!-- ================================================= -->
 
@@ -1450,6 +1532,10 @@ def home():
             ).style.display = "none";
 
             document.getElementById(
+                "selfieMenu"
+            ).style.display = "none";
+
+            document.getElementById(
                 "directionMenu"
             ).style.display = "none";
 
@@ -1751,6 +1837,7 @@ def home():
             document.getElementById("medicineMenu").style.display = "none";
             document.getElementById("skynoidQnaMenu").style.display = "none";
             document.getElementById("droneQnaMenu").style.display = "none";
+            document.getElementById("selfieMenu").style.display = "none";
         }
 
         function showSkynoidQnaMenu() {
@@ -1772,6 +1859,80 @@ def home():
                 command,
                 { question_id: questionId }
             );
+        }
+
+
+        // ====================================================
+        // SELFIE
+        // ====================================================
+
+        let selfiePollTimer = null;
+        let selfieStartVersion = 0;
+
+        async function takeSelfie() {
+            hideAllMenus();
+            document.getElementById("selfieMenu").style.display = "block";
+            document.getElementById("selfiePhoto").style.display = "none";
+            document.getElementById("selfieDownload").style.display = "none";
+            document.getElementById("selfieAgain").style.display = "none";
+            document.getElementById("selfieWaiting").style.display = "block";
+            document.getElementById("selfieWaiting").innerText =
+                "Look at SkyNoid and smile. Waiting for the camera...";
+
+            if (selfiePollTimer) clearInterval(selfiePollTimer);
+
+            try {
+                const r = await fetch("/selfie/status?ts=" + Date.now(),
+                                      {cache:"no-store"});
+                const s = await r.json();
+                selfieStartVersion = Number(s.version || 0);
+            } catch (e) {
+                selfieStartVersion = 0;
+            }
+
+            const success = await sendCommand("TAKE_SELFIE");
+            if (!success) return;
+
+            let attempts = 0;
+            selfiePollTimer = setInterval(async function() {
+                attempts += 1;
+                try {
+                    const r = await fetch("/selfie/status?ts=" + Date.now(),
+                                          {cache:"no-store"});
+                    const s = await r.json();
+                    if (s.available &&
+                        Number(s.version || 0) > selfieStartVersion) {
+                        clearInterval(selfiePollTimer);
+                        selfiePollTimer = null;
+                        const v = encodeURIComponent(s.version);
+                        const photo = document.getElementById("selfiePhoto");
+                        photo.src = "/selfie/latest?v=" + v;
+                        photo.style.display = "block";
+                        const dl = document.getElementById("selfieDownload");
+                        dl.href = "/selfie/download?v=" + v;
+                        dl.style.display = "block";
+                        document.getElementById("selfieAgain").style.display = "block";
+                        document.getElementById("selfieWaiting").style.display = "none";
+                        document.getElementById("status").innerText =
+                            "Selfie received from SkyNoid.";
+                    }
+                } catch (e) {}
+
+                if (attempts >= 45) {
+                    clearInterval(selfiePollTimer);
+                    selfiePollTimer = null;
+                    document.getElementById("selfieWaiting").innerText =
+                        "The selfie did not arrive. Please try again.";
+                    document.getElementById("selfieAgain").style.display = "block";
+                    document.getElementById("status").innerText =
+                        "Selfie request timed out.";
+                }
+            }, 1000);
+        }
+
+        function signLanguageComingSoon() {
+            document.getElementById("status").innerText =
+                "Learn Sign Language will be added next.";
         }
 
 
@@ -2161,6 +2322,13 @@ def home():
                     "Asking SkyNoid to guess your mood...";
 
             }
+ 
+            else if (
+                command === "TAKE_SELFIE"
+            ) {
+                status.innerText =
+                    "Asking SkyNoid to take your selfie...";
+            }
 
             else {
 
@@ -2263,6 +2431,13 @@ def home():
                     status.innerText =
                         "Guess My Mood request sent to SkyNoid.";
 
+                }
+
+                else if (
+                    command === "TAKE_SELFIE"
+                ) {
+                    status.innerText =
+                        "Selfie request sent to SkyNoid. Look at the camera.";
                 }
 
                 else {
@@ -2455,6 +2630,67 @@ def download_calendar(
         }
     )
 
+
+
+# ============================================================
+# SELFIE HANDOFF - MEMORY ONLY
+# ============================================================
+
+@app.post("/robot/selfie")
+async def upload_selfie(
+    authorization: str | None = Header(default=None),
+    image: UploadFile = File(...)
+):
+    authenticate_robot(authorization)
+
+    if image.content_type not in {"image/jpeg", "image/jpg"}:
+        raise HTTPException(status_code=400, detail="Selfie must be JPEG")
+
+    data = await image.read()
+    if not data or len(data) > 8 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Invalid selfie image")
+
+    global latest_selfie_bytes, latest_selfie_version, latest_selfie_at
+    latest_selfie_bytes = data
+    latest_selfie_version += 1
+    latest_selfie_at = datetime.utcnow().isoformat()
+
+    return {"success": True, "version": latest_selfie_version}
+
+
+@app.get("/selfie/status")
+def selfie_status():
+    return {
+        "available": latest_selfie_bytes is not None,
+        "version": latest_selfie_version,
+        "updated_at": latest_selfie_at
+    }
+
+
+@app.get("/selfie/latest")
+def latest_selfie():
+    if latest_selfie_bytes is None:
+        raise HTTPException(status_code=404, detail="No selfie is available")
+    return Response(
+        content=latest_selfie_bytes,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"}
+    )
+
+
+@app.get("/selfie/download")
+def download_selfie():
+    if latest_selfie_bytes is None:
+        raise HTTPException(status_code=404, detail="No selfie is available")
+    filename = "SkyNoid_Selfie_" + datetime.now().strftime("%Y%m%d_%H%M%S") + ".jpg"
+    return Response(
+        content=latest_selfie_bytes,
+        media_type="image/jpeg",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store, no-cache, must-revalidate"
+        }
+    )
 
 
 # ============================================================
@@ -3113,7 +3349,7 @@ def health():
             ),
 
         "version":
-            "2.2",
+            "2.3",
 
         "medicine_reminders":
             True
