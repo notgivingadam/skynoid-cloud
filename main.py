@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from fastapi import FastAPI, Header, HTTPException, File, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
-
+from fastapi.staticfiles import StaticFiles
 
 # ============================================================
 # SKYNOID CLOUD SERVER
@@ -20,6 +20,11 @@ app = FastAPI(
     version="2.3"
 )
 
+app.mount(
+    "/static",
+    StaticFiles(directory="static"),
+    name="static"
+)
 
 # ============================================================
 # CONFIGURATION
@@ -71,6 +76,7 @@ ALLOWED_COMMANDS = {
     "DRONE_QNA",
     "GUESS_MOOD",
     "TAKE_SELFIE",
+    "TEACH_SIGN",
 }
 
 
@@ -875,7 +881,7 @@ def home():
 
                 <button
                     class="qna-buzzer qna-sign-button"
-                    onclick="signLanguageComingSoon()"
+                    onclick="showSignLanguageMenu()"
                     aria-label="Learn sign language"
                 >
                     <span class="qna-buzzer-icon">🤟</span>
@@ -1223,6 +1229,44 @@ def home():
 
 
         <!-- ================================================= -->
+        <!-- 🤟 LEARN SIGN LANGUAGE                            -->
+        <!-- ================================================= -->
+        <div id="signLanguageMenu" style="display: none;">
+            <h2>🤟 LEARN SIGN LANGUAGE</h2>
+            <div class="subtitle">Learn Indian Sign Language with SkyNoid</div>
+            <button class="button question-button" onclick="showSignLesson('HELLO')">
+                👋 1. Hello
+            </button>
+            <button class="button back-button" onclick="showMainMenu()">
+                ← Back to Menu
+            </button>
+        </div>
+
+        <!-- ================================================= -->
+        <!-- 🤟 SIGN LANGUAGE LESSON                           -->
+        <!-- ================================================= -->
+        <div id="signLessonMenu" style="display: none;">
+            <h2>👋 HELLO</h2>
+            <div class="subtitle">Indian Sign Language</div>
+            <div class="selfie-card">
+                <img
+                    src="/static/signs/01_hello.jpg"
+                    alt="Hello sign demonstration"
+                    style="width:100%;max-width:420px;height:auto;object-fit:contain;display:block;margin:0 auto 16px auto;border-radius:14px;"
+                >
+                <div style="line-height:1.5;margin-bottom:18px;">
+                    Follow the demonstration shown above to learn the sign for Hello.
+                </div>
+                <button class="button" onclick="teachSign('HELLO')">
+                    🔊 Let SkyNoid Teach Me
+                </button>
+            </div>
+            <button class="button back-button" onclick="showSignLanguageMenu()">
+                ← Back to Signs
+            </button>
+        </div>
+
+        <!-- ================================================= -->
         <!-- MEDICINE REMINDER MENU                            -->
         <!-- ================================================= -->
 
@@ -1536,6 +1580,14 @@ def home():
             ).style.display = "none";
 
             document.getElementById(
+                "signLanguageMenu"
+            ).style.display = "none";
+
+            document.getElementById(
+                "signLessonMenu"
+            ).style.display = "none";
+
+            document.getElementById(
                 "directionMenu"
             ).style.display = "none";
 
@@ -1838,6 +1890,8 @@ def home():
             document.getElementById("skynoidQnaMenu").style.display = "none";
             document.getElementById("droneQnaMenu").style.display = "none";
             document.getElementById("selfieMenu").style.display = "none";
+            document.getElementById("signLanguageMenu").style.display = "none";
+            document.getElementById("signLessonMenu").style.display = "none";
         }
 
         function showSkynoidQnaMenu() {
@@ -1930,9 +1984,30 @@ def home():
             }, 1000);
         }
 
-        function signLanguageComingSoon() {
+        // ====================================================
+        // SIGN LANGUAGE
+        // ====================================================
+        function showSignLanguageMenu() {
+            hideAllMenus();
+            document.getElementById("signLanguageMenu").style.display = "block";
             document.getElementById("status").innerText =
-                "Learn Sign Language will be added next.";
+                "Select a sign to learn with SkyNoid.";
+        }
+
+        function showSignLesson(signId) {
+            if (signId !== "HELLO") {
+                document.getElementById("status").innerText =
+                    "This sign lesson is not available yet.";
+                return;
+            }
+            hideAllMenus();
+            document.getElementById("signLessonMenu").style.display = "block";
+            document.getElementById("status").innerText =
+                "Follow the Hello sign demonstration shown above.";
+        }
+
+        function teachSign(signId) {
+            sendCommand("TEACH_SIGN", { sign_id: signId });
         }
 
 
@@ -2330,6 +2405,13 @@ def home():
                     "Asking SkyNoid to take your selfie...";
             }
 
+            else if (
+                command === "TEACH_SIGN"
+            ) {
+                status.innerText =
+                    "Asking SkyNoid to teach the selected sign...";
+            }
+
             else {
 
                 status.innerText =
@@ -2438,6 +2520,13 @@ def home():
                 ) {
                     status.innerText =
                         "Selfie request sent to SkyNoid. Look at the camera.";
+                }
+
+                else if (
+                    command === "TEACH_SIGN"
+                ) {
+                    status.innerText =
+                        "Sign lesson request sent to SkyNoid.";
                 }
 
                 else {
@@ -3064,6 +3153,35 @@ def submit_command(
 
         payload = {
             "question_id": question_id
+        }
+
+
+    # --------------------------------------------------------
+    # SIGN LANGUAGE
+    # --------------------------------------------------------
+
+    elif command == "TEACH_SIGN":
+
+        sign_id = str(
+            payload.get(
+                "sign_id",
+                ""
+            )
+        ).strip().upper()
+
+        allowed_signs = {
+            "HELLO",
+        }
+
+        if sign_id not in allowed_signs:
+
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid SkyNoid sign"
+            )
+
+        payload = {
+            "sign_id": sign_id
         }
 
 
