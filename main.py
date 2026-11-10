@@ -1234,36 +1234,25 @@ def home():
         <div id="signLanguageMenu" style="display: none;">
             <h2>🤟 LEARN SIGN LANGUAGE</h2>
             <div class="subtitle">Learn Indian Sign Language with SkyNoid</div>
-            <button class="button question-button" onclick="showSignLesson('HELLO')">
-                👋 1. Hello
-            </button>
-            <button class="button back-button" onclick="showMainMenu()">
-                ← Back to Menu
-            </button>
+            <div id="signButtons"></div>
+            <button class="button back-button" onclick="showMainMenu()">← Back to Menu</button>
         </div>
 
         <!-- ================================================= -->
         <!-- 🤟 SIGN LANGUAGE LESSON                           -->
         <!-- ================================================= -->
         <div id="signLessonMenu" style="display: none;">
-            <h2>👋 HELLO</h2>
+            <h2 id="signLessonTitle">🤟 SIGN</h2>
             <div class="subtitle">Indian Sign Language</div>
             <div class="selfie-card">
-                <img
-                    src="/static/signs/01_hello.jpg"
-                    alt="Hello sign demonstration"
-                    style="width:100%;max-width:420px;height:auto;object-fit:contain;display:block;margin:0 auto 16px auto;border-radius:14px;"
-                >
-                <div style="line-height:1.5;margin-bottom:18px;">
-                    Follow the demonstration shown above to learn the sign for Hello.
+                <img id="signLessonImage" src="" alt="Indian Sign Language demonstration"
+                     style="width:100%;max-width:420px;height:auto;object-fit:contain;display:block;margin:0 auto 16px auto;border-radius:14px;">
+                <div id="signLessonText" style="line-height:1.5;margin-bottom:18px;">
+                    Follow the demonstration shown above.
                 </div>
-                <button class="button" onclick="teachSign('HELLO')">
-                    🔊 Let SkyNoid Teach Me
-                </button>
+                <button id="signTeachButton" class="button">🔊 Let SkyNoid Teach Me</button>
             </div>
-            <button class="button back-button" onclick="showSignLanguageMenu()">
-                ← Back to Signs
-            </button>
+            <button class="button back-button" onclick="showSignLanguageMenu()">← Back to Signs</button>
         </div>
 
         <!-- ================================================= -->
@@ -1987,27 +1976,81 @@ def home():
         // ====================================================
         // SIGN LANGUAGE
         // ====================================================
+
+        const SIGN_LESSONS = {
+            HELLO:{number:1,name:"Hello",emoji:"👋",image:"/static/signs/01_hello.jpg"},
+            THANK_YOU:{number:2,name:"Thank You",emoji:"🙏",image:"/static/signs/02_thank_you.jpg"},
+            PLEASE:{number:3,name:"Please",emoji:"🤲",image:"/static/signs/03_please.jpg"},
+            SORRY:{number:4,name:"Sorry",emoji:"🙏",image:"/static/signs/04_sorry.jpg"},
+            YES:{number:5,name:"Yes",emoji:"✅",image:"/static/signs/05_yes.jpg"},
+            NO:{number:6,name:"No",emoji:"❌",image:"/static/signs/06_no.jpg"},
+            HELP:{number:7,name:"Help",emoji:"🆘",image:"/static/signs/07_help.jpg"},
+            STOP:{number:8,name:"Stop",emoji:"✋",image:"/static/signs/08_stop.jpg"},
+            WAIT:{number:9,name:"Wait",emoji:"⏳",image:"/static/signs/09_wait.jpg"},
+            FINISH:{number:10,name:"Finish",emoji:"🏁",image:"/static/signs/10_finish.jpg"},
+            COME:{number:11,name:"Come",emoji:"👋",image:"/static/signs/11_come.jpg"},
+            GO:{number:12,name:"Go",emoji:"➡️",image:"/static/signs/12_go.jpg"},
+            I_ME:{number:13,name:"I / Me",emoji:"🙋",image:"/static/signs/13_i_me.jpg"},
+            YOU:{number:14,name:"You",emoji:"👉",image:"/static/signs/14_you.jpg"},
+            NAME:{number:15,name:"Name",emoji:"🏷️",image:"/static/signs/15_name.jpg"},
+            WATER:{number:16,name:"Water",emoji:"💧",image:"/static/signs/16_water.jpg"},
+            FOOD:{number:17,name:"Food",emoji:"🍽️",image:"/static/signs/17_food.jpg"},
+            WASHROOM:{number:18,name:"Washroom",emoji:"🚻",image:"/static/signs/18_washroom.jpg"},
+            HOME:{number:19,name:"Home",emoji:"🏠",image:"/static/signs/19_home.jpg"},
+            LOVE:{number:20,name:"Love",emoji:"❤️",image:"/static/signs/20_love.jpg"},
+            PEACE:{number:21,name:"Peace",emoji:"☮️",image:"/static/signs/21_peace.jpg"},
+            GOOD_MORNING:{number:22,name:"Good Morning",emoji:"🌅",image:"/static/signs/22_good_morning.jpg"},
+            GOOD_NIGHT:{number:23,name:"Good Night",emoji:"🌙",image:"/static/signs/23_good_night.jpg"},
+            FRIEND:{number:24,name:"Friend",emoji:"🤝",image:"/static/signs/24_friend.jpg"},
+            TEACHER:{number:25,name:"Teacher",emoji:"🧑‍🏫",image:"/static/signs/25_teacher.jpg"}
+        };
+
+        function buildSignButtons() {
+            const container = document.getElementById("signButtons");
+            if (container.children.length > 0) return;
+            Object.entries(SIGN_LESSONS).forEach(function([signId, sign]) {
+                const button = document.createElement("button");
+                button.className = "button question-button";
+                button.innerText = sign.emoji + " " + sign.number + ". " + sign.name;
+                button.onclick = function() { showSignLesson(signId); };
+                container.appendChild(button);
+            });
+        }
+
         function showSignLanguageMenu() {
             hideAllMenus();
+            buildSignButtons();
             document.getElementById("signLanguageMenu").style.display = "block";
-            document.getElementById("status").innerText =
-                "Select a sign to learn with SkyNoid.";
+            document.getElementById("status").innerText = "Select a sign to learn with SkyNoid.";
         }
 
         function showSignLesson(signId) {
-            if (signId !== "HELLO") {
-                document.getElementById("status").innerText =
-                    "This sign lesson is not available yet.";
+            const sign = SIGN_LESSONS[signId];
+            if (!sign) {
+                document.getElementById("status").innerText = "This sign lesson is not available.";
                 return;
             }
             hideAllMenus();
             document.getElementById("signLessonMenu").style.display = "block";
+            document.getElementById("signLessonTitle").innerText =
+                sign.emoji + " " + sign.name.toUpperCase();
+            const image = document.getElementById("signLessonImage");
+            image.src = sign.image;
+            image.alt = sign.name + " sign demonstration";
+            document.getElementById("signLessonText").innerText =
+                "Follow the demonstration shown above to learn the sign for " + sign.name + ".";
+            document.getElementById("signTeachButton").onclick =
+                function() { teachSign(signId); };
             document.getElementById("status").innerText =
-                "Follow the Hello sign demonstration shown above.";
+                "Follow the " + sign.name + " sign demonstration shown above.";
         }
 
         function teachSign(signId) {
-            sendCommand("TEACH_SIGN", { sign_id: signId });
+            if (!SIGN_LESSONS[signId]) {
+                document.getElementById("status").innerText = "Invalid sign lesson.";
+                return;
+            }
+            sendCommand("TEACH_SIGN", {sign_id: signId});
         }
 
 
@@ -3171,6 +3214,30 @@ def submit_command(
 
         allowed_signs = {
             "HELLO",
+            "THANK_YOU",
+            "PLEASE",
+            "SORRY",
+            "YES",
+            "NO",
+            "HELP",
+            "STOP",
+            "WAIT",
+            "FINISH",
+            "COME",
+            "GO",
+            "I_ME",
+            "YOU",
+            "NAME",
+            "WATER",
+            "FOOD",
+            "WASHROOM",
+            "HOME",
+            "LOVE",
+            "PEACE",
+            "GOOD_MORNING",
+            "GOOD_NIGHT",
+            "FRIEND",
+            "TEACHER",
         }
 
         if sign_id not in allowed_signs:
